@@ -1,0 +1,14 @@
+# Ignore all debug files
+Debug/
+
+battery_management_system_23 Debug.launch
+
+#Ignore all build files
+build/
+
+.vscode/
+.cproject.bak
+.project.bak
+Makefile
+STM32Make.make
+startup_stm32f446xx.s
