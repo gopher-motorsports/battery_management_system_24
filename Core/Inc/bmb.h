@@ -1,5 +1,5 @@
-#ifndef INC_ADBMS6830_H_
-#define INC_ADBMS6830_H_
+#ifndef INC_BMB_H_
+#define INC_BMB_H_
 
 /* ==================================================================== */
 /* ============================= INCLUDES ============================= */
@@ -10,12 +10,7 @@
 /* ============================= DEFINES ============================== */
 /* ==================================================================== */
 
-#define BITS_IN_BYTE        8
-#define BITS_IN_WORD        16
-#define BYTES_IN_WORD       2
-
-#define COMMAND_SIZE_BYTES       2
-#define REGISTER_SIZE_BYTES      6
+#define NUM_CELLS_PER_BMB 18
 
 /* ==================================================================== */
 /* ========================= ENUMERATED TYPES========================== */
@@ -23,17 +18,27 @@
 
 typedef enum
 {
-    TRANSACTION_FAIL = 0 ,
-    TRANSACTION_SUCCESS
-} TRANSACTION_STATUS_E;
+    UNINITIALIZED = 0,
+    GOOD,
+    BAD
+} SENSOR_STATUS_E;
 
 /* ==================================================================== */
-/* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
+/* ============================== STRUCTS============================== */
 /* ==================================================================== */
 
-TRANSACTION_STATUS_E commandAll(uint16_t command, uint32_t numBmbs);
-TRANSACTION_STATUS_E writeAll(uint16_t command, uint8_t *txData, uint32_t numBmbs);
-TRANSACTION_STATUS_E readAll(uint16_t command, uint8_t *rxData, uint32_t numBmbs);
+// TODO add description
+typedef struct
+{   
+    float cellVoltage[NUM_CELLS_PER_BMB];
+    SENSOR_STATUS_E cellVoltageStatus[NUM_CELLS_PER_BMB];
+} Bmb_S;
 
-#endif /* INC_ADBMS6830_H_ */
 
+/* ==================================================================== */
+/* =================== GLOBAL FUNCTION DECLARATIONS =================== */
+/* ==================================================================== */
+
+void updateBmbTelemetry(Bmb_S* bmb, uint32_t numBmbs);
+
+#endif /* INC_BMB_H_ */

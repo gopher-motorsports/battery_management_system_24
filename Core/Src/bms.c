@@ -1,39 +1,32 @@
-#ifndef INC_ADBMS6830_H_
-#define INC_ADBMS6830_H_
-
 /* ==================================================================== */
 /* ============================= INCLUDES ============================= */
 /* ==================================================================== */
-#include <stdint.h>
+
+#include "bms.h"
+#include "stm32f4xx_hal.h"
 
 /* ==================================================================== */
 /* ============================= DEFINES ============================== */
 /* ==================================================================== */
 
-#define BITS_IN_BYTE        8
-#define BITS_IN_WORD        16
-#define BYTES_IN_WORD       2
-
-#define COMMAND_SIZE_BYTES       2
-#define REGISTER_SIZE_BYTES      6
+#define BMB_UPDATE_PERIOD_MS        100
 
 /* ==================================================================== */
-/* ========================= ENUMERATED TYPES========================== */
+/* ========================= LOCAL VARIABLES ========================== */
 /* ==================================================================== */
 
-typedef enum
-{
-    TRANSACTION_FAIL = 0 ,
-    TRANSACTION_SUCCESS
-} TRANSACTION_STATUS_E;
+Bms_S gBms;
 
 /* ==================================================================== */
 /* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
 /* ==================================================================== */
 
-TRANSACTION_STATUS_E commandAll(uint16_t command, uint32_t numBmbs);
-TRANSACTION_STATUS_E writeAll(uint16_t command, uint8_t *txData, uint32_t numBmbs);
-TRANSACTION_STATUS_E readAll(uint16_t command, uint8_t *rxData, uint32_t numBmbs);
-
-#endif /* INC_ADBMS6830_H_ */
-
+void updatePackTelemetry()
+{
+    static uint32_t lastBmbUpdate = 0;
+    if((HAL_GetTick() - lastBmbUpdate) > BMB_UPDATE_PERIOD_MS)
+    {
+        lastBmbUpdate = HAL_GetTick();
+        updateBmbTelemetry(gBms.bmb, NUM_BMBS_IN_ACCUMULATOR);
+    }
+}

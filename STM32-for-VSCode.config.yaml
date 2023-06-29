@@ -75,6 +75,8 @@ includeDirectories:
   - Src/**
   - Core/Src/**
   - Core/Lib/**
+  - Drivers/STM32F4xx_HAL_Driver/Inc
+  - Drivers/STM32F4xx_HAL_Driver/Inc/Legacy
 
 
 # Files that should be included in the compilation.
@@ -86,6 +88,8 @@ sourceFiles:
   - Src/**
   - Core/Src/**
   - Core/Lib/**
+  - Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c
+  - Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c
 
 
 # When no makefile is present it will show a warning pop-up.
