@@ -33,6 +33,7 @@ typedef struct Bms
 /* =================== GLOBAL FUNCTION DECLARATIONS =================== */
 /* ==================================================================== */
 
-void updatePackTelemetry();
+// void updatePackTelemetry();
+void updateTestData();
 
 #endif /* INC_BMS_H_ */

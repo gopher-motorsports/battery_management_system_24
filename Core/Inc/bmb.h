@@ -31,6 +31,7 @@ typedef enum
 typedef struct
 {   
     float cellVoltage[NUM_CELLS_PER_BMB];
+    uint8_t testData[6];
     SENSOR_STATUS_E cellVoltageStatus[NUM_CELLS_PER_BMB];
 } Bmb_S;
 
@@ -39,6 +40,7 @@ typedef struct
 /* =================== GLOBAL FUNCTION DECLARATIONS =================== */
 /* ==================================================================== */
 
-void updateBmbTelemetry(Bmb_S* bmb, uint32_t numBmbs);
+// void updateBmbTelemetry(Bmb_S* bmb, uint32_t numBmbs);
+void testRead(Bmb_S* bmb, uint32_t numBmbs);
 
 #endif /* INC_BMB_H_ */

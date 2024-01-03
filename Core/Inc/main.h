@@ -65,6 +65,10 @@ void Error_Handler(void);
 #define BMB_MOSI_GPIO_Port GPIOA
 #define PORTB_CS_Pin GPIO_PIN_7
 #define PORTB_CS_GPIO_Port GPIOC
+#define MAS2_Pin GPIO_PIN_10
+#define MAS2_GPIO_Port GPIOA
+#define MAS1_Pin GPIO_PIN_4
+#define MAS1_GPIO_Port GPIOB
 #define PORTA_CS_Pin GPIO_PIN_6
 #define PORTA_CS_GPIO_Port GPIOB
 

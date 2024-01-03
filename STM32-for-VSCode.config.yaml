@@ -44,7 +44,10 @@ assemblyFlags:
   - -fdata-sections
   - -ffunction-sections
 
-linkerFlags: []
+linkerFlags: 
+  - -specs=nano.specs
+  - -u _printf_float
+  - -u _scanf_float
 
 # libraries to be included. The -l prefix to the library will be automatically added.
 libraries: 

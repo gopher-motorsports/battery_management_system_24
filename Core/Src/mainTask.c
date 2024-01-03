@@ -34,18 +34,27 @@ static void printCellVoltages();
 
 void initMain()
 {
-	
+	HAL_GPIO_WritePin(MAS1_GPIO_Port, MAS1_Pin, SET);
+    HAL_GPIO_WritePin(MAS2_GPIO_Port, MAS2_Pin, SET);
 }
 
 void runMain()
 {
-    updatePackTelemetry();
+    // updatePackTelemetry();
+    updateTestData();
 
     static uint32_t lastUpdateMain = 0;
     if((HAL_GetTick() - lastUpdateMain) > MAIN_UPDATE_PERIOD_MS)
     {
         lastUpdateMain = HAL_GetTick();
-        printCellVoltages();
+        printf("\e[1;1H\e[2J");
+        // printCellVoltages();
+        printf("Test Read Result: \n");
+        for(int32_t i = 0; i < 6; i++)
+        {
+            printf("%X\n", gBms.bmb[0].testData[i]);
+        }
+        
     }
 }
 
@@ -71,6 +80,7 @@ static void printCellVoltages()
             {
                 printf("NO SIGNAL");
             }
+            printf("|\n");
         }
     }
 	printf("\n");
