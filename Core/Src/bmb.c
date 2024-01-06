@@ -99,10 +99,12 @@
 
 void testRead(Bmb_S* bmb, uint32_t numBmbs)
 {
+    wakeChain(numBmbs);
+
     uint8_t registerData[REGISTER_SIZE_BYTES];
-    // uint8_t data[6] = {0x01, 0x00, 0x00, 0x05, 0x01, 0x00};
+    uint8_t data[6] = {0x01, 0x00, 0x00, 0x05, 0x01, 0x00};
     readAll(0x0002, registerData, numBmbs);
-    // writeAll(0x0001, data, numBmbs);
+    writeAll(0x0001, data, numBmbs);
     
     for(int32_t i = 0; i < REGISTER_SIZE_BYTES; i++)
     {

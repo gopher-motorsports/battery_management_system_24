@@ -72,7 +72,7 @@ typedef struct
 /* ============================ CRC TABLES ============================ */
 /* ==================================================================== */
 
-commandCrcTable[CRC_LUT_SIZE] = 
+uint16_t commandCrcTable[CRC_LUT_SIZE] = 
 {
     0x0000, 0x8B32, 0x9D56, 0x1664, 0xB19E, 0x3AAC, 0x2CC8, 0xA7FA, 0xE80E, 0x633C, 0x7558, 0xFE6A, 0x5990, 0xD2A2, 0xC4C6, 0x4FF4,
     0x5B2E, 0xD01C, 0xC678, 0x4D4A, 0xEAB0, 0x6182, 0x77E6, 0xFCD4, 0xB320, 0x3812, 0x2E76, 0xA544, 0x02BE, 0x898C, 0x9FE8, 0x14DA,
@@ -92,7 +92,7 @@ commandCrcTable[CRC_LUT_SIZE] =
     0x4EDE, 0xC5EC, 0xD388, 0x58BA, 0xFF40, 0x7472, 0x6216, 0xE924, 0xA6D0, 0x2DE2, 0x3B86, 0xB0B4, 0x174E, 0x9C7C, 0x8A18, 0x012A
 };
 
-dataCrcTable[CRC_LUT_SIZE] = 
+uint16_t dataCrcTable[CRC_LUT_SIZE] = 
 {
     0x0000, 0x048F, 0x091E, 0x0D91, 0x123C, 0x16B3, 0x1B22, 0x1FAD, 0x24F7, 0x2078, 0x2DE9, 0x2966, 0x36CB, 0x3244, 0x3FD5, 0x3B5A,
     0x49EE, 0x4D61, 0x40F0, 0x447F, 0x5BD2, 0x5F5D, 0x52CC, 0x5643, 0x6D19, 0x6996, 0x6407, 0x6088, 0x7F25, 0x7BAA, 0x763B, 0x72B4,
@@ -109,7 +109,7 @@ dataCrcTable[CRC_LUT_SIZE] =
     0x69D6, 0x6D59, 0x60C8, 0x6447, 0x7BEA, 0x7F65, 0x72F4, 0x767B, 0x4D21, 0x49AE, 0x443F, 0x40B0, 0x5F1D, 0x5B92, 0x5603, 0x528C,
     0x2038, 0x24B7, 0x2926, 0x2DA9, 0x3204, 0x368B, 0x3B1A, 0x3F95, 0x04CF, 0x0040, 0x0DD1, 0x095E, 0x16F3, 0x127C, 0x1FED, 0x1B62,
     0xFA0A, 0xFE85, 0xF314, 0xF79B, 0xE836, 0xECB9, 0xE128, 0xE5A7, 0xDEFD, 0xDA72, 0xD7E3, 0xD36C, 0xCCC1, 0xC84E, 0xC5DF, 0xC150,
-    0xB3E4, 0xB76B, 0xBAFA, 0xBE75, 0xA1D8, 0xA557, 0xA8C6, 0xAC49, 0x9713, 0x939C, 0x9E0D, 0x9A82, 0x852F, 0x81A0, 0x8C31. 0X88BE
+    0xB3E4, 0xB76B, 0xBAFA, 0xBE75, 0xA1D8, 0xA557, 0xA8C6, 0xAC49, 0x9713, 0x939C, 0x9E0D, 0x9A82, 0x852F, 0x81A0, 0x8C31, 0X88BE
 };
 
 /* ==================================================================== */
@@ -140,33 +140,9 @@ static void openPort(PORT_E port)
     if(port == PORTA)
     {        
         HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_SET);
-        vTaskDelay(1 * portTICK_PERIOD_MS);
-
-        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_SET);
-        vTaskDelay(1 * portTICK_PERIOD_MS);
-
-        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_SET);
-        vTaskDelay(1 * portTICK_PERIOD_MS);
-
-        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_RESET);
     }
     else if(port == PORTB)
-    {
-        HAL_GPIO_WritePin(PORTB_CS_GPIO_Port, PORTB_CS_Pin, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(PORTB_CS_GPIO_Port, PORTB_CS_Pin, GPIO_PIN_SET);
-        vTaskDelay(1 * portTICK_PERIOD_MS);
-
-        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_SET);
-        vTaskDelay(1 * portTICK_PERIOD_MS);
-
-        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_RESET);
-        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_SET);
-        vTaskDelay(1 * portTICK_PERIOD_MS);
-        
+    {   
         HAL_GPIO_WritePin(PORTB_CS_GPIO_Port, PORTB_CS_Pin, GPIO_PIN_RESET);
     }
 }
@@ -302,7 +278,6 @@ static TRANSACTION_STATUS_E writeRegister(uint16_t command, uint8_t *txBuff, uin
         return TRANSACTION_FAIL;
     }
     closePort(port);
-    incCommandCounter();
     return TRANSACTION_SUCCESS;
 }
 
@@ -414,52 +389,73 @@ static void enumerateBmbs(uint32_t numBmbs)
 // /* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
 // /* ==================================================================== */
 
-// TRANSACTION_STATUS_E commandAll(uint16_t command, uint32_t numBmbs)
-// { 
-//     // Communication will only be repeated if the first attempt fails and
-//     // the first consecutive enumeration event re-establishes communication
-//     // This allows comms to remain stable if a new chain break occurs between transactions
-//     for(int32_t i = 0; i < 2; i++)
-//     {
-//         if(chainInfo.chainStatus == CHAIN_COMPLETE)
-//         {
-//             // If the chain is complete, swap the origin port every write transaction
-//             static PORT_E originPort = PORTA;
-//             if(sendCommand(command, numBmbs, PORTA) == TRANSACTION_SUCCESS)
-//             {
-//                 // On a transaction success, swap origin port, and return success
-//                 originPort = !originPort;
-//                 return TRANSACTION_SUCCESS;
-//             }
-//         }
-//         else
-//         {
-//             // If there are any chain breaks, use both ports to reach as many bmbs as possible
-//             TRANSACTION_STATUS_E portAStatus = (chainInfo.availableBmbs[PORTA] > 0) ? (sendCommand(command, chainInfo.availableBmbs[PORTA], PORTA)) : (TRANSACTION_SUCCESS);
-//             TRANSACTION_STATUS_E portBStatus = (chainInfo.availableBmbs[PORTB] > 0) ? (sendCommand(command, chainInfo.availableBmbs[PORTB], PORTB)) : (TRANSACTION_SUCCESS); 
+void wakeChain(uint32_t numBmbs)
+{
+    for(int32_t i = 0; i < (chainInfo.availableBmbs[PORTA] + 2); i++)
+    {
+        //TODO May need to set this in init function
+        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_SET);
+        vTaskDelay(1 * portTICK_PERIOD_MS);
+    }
 
-//             if((portAStatus == TRANSACTION_SUCCESS) && (portBStatus == TRANSACTION_SUCCESS))
-//             {
-//                 if(chainInfo.chainStatus == SINGLE_CHAIN_BREAK)
-//                 {
-//                     // If every bmb is successfully reached, re-enumerate and return success
-//                     // enumerateBmbs(numBmbs);
-//                     return TRANSACTION_SUCCESS; 
-//                 }
-//                 else
-//                 {
-//                     // If not every bmb is successfully reached, re-enumerate and return failure
-//                     enumerateBmbs(numBmbs);
-//                     return TRANSACTION_FAIL;
-//                 }
-//             }
-//         }
-//         // If the bms fails to communicate with the expected number of bmbs,
-//         // re-enumerate and retry a maximum of 1 time
-//         enumerateBmbs(numBmbs);
-//     }
-//     return TRANSACTION_FAIL;
-// }
+    if(chainInfo.chainStatus != CHAIN_COMPLETE)
+    {
+        for(int32_t i = 0; i < (chainInfo.availableBmbs[PORTB] + 2); i++)
+        {
+            HAL_GPIO_WritePin(PORTB_CS_GPIO_Port, PORTB_CS_Pin, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(PORTB_CS_GPIO_Port, PORTB_CS_Pin, GPIO_PIN_SET);
+            vTaskDelay(1 * portTICK_PERIOD_MS);
+        }
+    }
+}
+
+TRANSACTION_STATUS_E commandAll(uint16_t command, uint32_t numBmbs)
+{ 
+    // Communication will only be repeated if the first attempt fails and
+    // the first consecutive enumeration event re-establishes communication
+    // This allows comms to remain stable if a new chain break occurs between transactions
+    for(int32_t i = 0; i < 2; i++)
+    {
+        if(chainInfo.chainStatus == CHAIN_COMPLETE)
+        {
+            // If the chain is complete, swap the origin port every write transaction
+            static PORT_E originPort = PORTA;
+            if(sendCommand(command, numBmbs, PORTA) == TRANSACTION_SUCCESS)
+            {
+                // On a transaction success, swap origin port, and return success
+                originPort = !originPort;
+                return TRANSACTION_SUCCESS;
+            }
+        }
+        else
+        {
+            // If there are any chain breaks, use both ports to reach as many bmbs as possible
+            TRANSACTION_STATUS_E portAStatus = (chainInfo.availableBmbs[PORTA] > 0) ? (sendCommand(command, chainInfo.availableBmbs[PORTA], PORTA)) : (TRANSACTION_SUCCESS);
+            TRANSACTION_STATUS_E portBStatus = (chainInfo.availableBmbs[PORTB] > 0) ? (sendCommand(command, chainInfo.availableBmbs[PORTB], PORTB)) : (TRANSACTION_SUCCESS); 
+
+            if((portAStatus == TRANSACTION_SUCCESS) && (portBStatus == TRANSACTION_SUCCESS))
+            {
+                enumerateBmbs(numBmbs);
+                if(chainInfo.chainStatus == SINGLE_CHAIN_BREAK)
+                {
+                    // If every bmb is successfully reached, re-enumerate and return success
+                    // enumerateBmbs(numBmbs);
+                    return TRANSACTION_SUCCESS; 
+                }
+                else
+                {
+                    // If not every bmb is successfully reached, re-enumerate and return failure
+                    return TRANSACTION_FAIL;
+                }
+            }
+        }
+        // If the bms fails to communicate with the expected number of bmbs,
+        // re-enumerate and retry a maximum of 1 time
+        enumerateBmbs(numBmbs);
+    }
+    return TRANSACTION_FAIL;
+}
 
 TRANSACTION_STATUS_E writeAll(uint16_t command, uint8_t *txData, uint32_t numBmbs)
 { 
@@ -512,14 +508,6 @@ TRANSACTION_STATUS_E writeAll(uint16_t command, uint8_t *txData, uint32_t numBmb
 
 TRANSACTION_STATUS_E readAll(uint16_t command, uint8_t *rxData, uint32_t numBmbs)
 { 
-    static bool init = true;
-    if(init)
-    {
-        // closePort(PORTB);
-        initCrcTables();
-    }
-    // readRegister(command, rxData, numBmbs, PORTA);
-
     // Communication will only be repeated if the first attempt fails and
     // the first consecutive enumeration event re-establishes communication
     // This allows comms to remain stable if a new chain break occurs between transactions

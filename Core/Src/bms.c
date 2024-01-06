@@ -34,7 +34,7 @@ Bms_S gBms;
 void updateTestData()
 {
     static uint32_t lastTestUpdate = 0;
-    if((HAL_GetTick() - lastTestUpdate) > 200)
+    if((HAL_GetTick() - lastTestUpdate) > 100)
     {
         lastTestUpdate = HAL_GetTick();
         testRead(gBms.bmb, NUM_BMBS_IN_ACCUMULATOR);
