@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "mainTask.h"
+#include "printTask.h"
 #include "spi.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -36,6 +36,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define BMB_UPDATE_TASK_PERIOD_MS   50
+#define PRINT_TASK_PERIOD_MS        1000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -48,10 +50,15 @@ SPI_HandleTypeDef hspi1;
 
 UART_HandleTypeDef huart2;
 
-osThreadId mainTaskHandle;
-uint32_t mainTaskBuffer[ 1024 ];
-osStaticThreadDef_t mainTaskControlBlock;
+osThreadId bmbUpdateTaskHandle;
+uint32_t bmbUpdateTaskBuffer[ 1024 ];
+osStaticThreadDef_t bmbUpdateTaskControlBlock;
+osThreadId printTaskHandle;
+uint32_t printTaskBuffer[ 1024 ];
+osStaticThreadDef_t printTaskControlBlock;
 /* USER CODE BEGIN PV */
+
+BmbTaskOutputData_S bmbTaskOutputData;
 
 /* USER CODE END PV */
 
@@ -60,7 +67,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART2_UART_Init(void);
-void StartMainTask(void const * argument);
+void StartBmbUpdateTask(void const * argument);
+void StartPrintTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 #ifdef __GNUC__
@@ -105,7 +113,7 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 	if (hspi == &hspi1)
 	{
 		static BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-		xTaskNotifyFromISR(mainTaskHandle, SPI_SUCCESS, eSetBits, &xHigherPriorityTaskWoken);
+		xTaskNotifyFromISR(bmbUpdateTaskHandle, SPI_SUCCESS, eSetBits, &xHigherPriorityTaskWoken);
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
 }
@@ -115,7 +123,7 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
   if (hspi == &hspi1)
 	{
 		static BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xTaskNotifyFromISR(mainTaskHandle, SPI_ERROR, eSetBits, &xHigherPriorityTaskWoken);
+    xTaskNotifyFromISR(bmbUpdateTaskHandle, SPI_ERROR, eSetBits, &xHigherPriorityTaskWoken);
 		portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 	}
 }
@@ -173,9 +181,13 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* definition and creation of mainTask */
-  osThreadStaticDef(mainTask, StartMainTask, osPriorityNormal, 0, 1024, mainTaskBuffer, &mainTaskControlBlock);
-  mainTaskHandle = osThreadCreate(osThread(mainTask), NULL);
+  /* definition and creation of bmbUpdateTask */
+  osThreadStaticDef(bmbUpdateTask, StartBmbUpdateTask, osPriorityNormal, 0, 1024, bmbUpdateTaskBuffer, &bmbUpdateTaskControlBlock);
+  bmbUpdateTaskHandle = osThreadCreate(osThread(bmbUpdateTask), NULL);
+
+  /* definition and creation of printTask */
+  osThreadStaticDef(printTask, StartPrintTask, osPriorityIdle, 0, 1024, printTaskBuffer, &printTaskControlBlock);
+  printTaskHandle = osThreadCreate(osThread(printTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -358,24 +370,48 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartMainTask */
+/* USER CODE BEGIN Header_StartBmbUpdateTask */
 /**
-  * @brief  Function implementing the mainTask thread.
+  * @brief  Function implementing the bmbUpdateTask thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartMainTask */
-void StartMainTask(void const * argument)
+/* USER CODE END Header_StartBmbUpdateTask */
+void StartBmbUpdateTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
-  initMain();
+  initBmbUpdateTask();
+  TickType_t lastBmbUpdateTaskTick = HAL_GetTick();
+  const TickType_t bmbUpdateTaskPeriod = pdMS_TO_TICKS(BMB_UPDATE_TASK_PERIOD_MS);
   for(;;)
   {
-    runMain();
-    osDelay(1);
+    runBmbUpdateTask();
+    vTaskDelayUntil(&lastBmbUpdateTaskTick, bmbUpdateTaskPeriod);
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartPrintTask */
+/**
+* @brief Function implementing the printTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartPrintTask */
+void StartPrintTask(void const * argument)
+{
+  /* USER CODE BEGIN StartPrintTask */
+  /* Infinite loop */
+  initPrintTask();
+  TickType_t lastPrintTaskTick = HAL_GetTick();
+  const TickType_t printTaskPeriod = pdMS_TO_TICKS(PRINT_TASK_PERIOD_MS);
+  for(;;)
+  {
+    runPrintTask();
+    vTaskDelayUntil(&lastPrintTaskTick, printTaskPeriod);
+  }
+  /* USER CODE END StartPrintTask */
 }
 
 /**

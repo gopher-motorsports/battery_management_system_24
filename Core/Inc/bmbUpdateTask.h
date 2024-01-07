@@ -1,39 +1,52 @@
-#ifndef INC_BMS_H_
-#define INC_BMS_H_
+#ifndef INC_BMBUPDATETASK_H_
+#define INC_BMBUPDATETASK_H_
 
 /* ==================================================================== */
 /* ============================= INCLUDES ============================= */
 /* ==================================================================== */
 
-#include <stdint.h>
-#include "bmb.h"
+#include "adbms6830.h"
+
 /* ==================================================================== */
 /* ============================= DEFINES ============================== */
 /* ==================================================================== */
 
 #define NUM_BMBS_IN_ACCUMULATOR     1
-#define NUM_BRICKS_PER_BMB          16
+#define NUM_CELLS_PER_BMB           16
 
 /* ==================================================================== */
 /* ========================= ENUMERATED TYPES========================== */
 /* ==================================================================== */
 
-/* ==================================================================== */
-/* ============================== STRUCTS============================== */
-/* ==================================================================== */
-
-typedef struct Bms
+typedef enum
 {
-	uint32_t numBmbs;
-	Bmb_S bmb[NUM_BMBS_IN_ACCUMULATOR];
+    UNINITIALIZED = 0,
+    GOOD,
+    BAD
+} SENSOR_STATUS_E;
 
-} Bms_S;
+/* ==================================================================== */
+/* ============================== STRUCTS ============================= */
+/* ==================================================================== */
+
+typedef struct
+{   
+    float cellVoltage[NUM_CELLS_PER_BMB];
+    uint8_t testData[6];
+    TRANSACTION_STATUS_E status;
+    SENSOR_STATUS_E cellVoltageStatus[NUM_CELLS_PER_BMB];
+} Bmb_S;
+
+typedef struct
+{
+	Bmb_S bmb[NUM_BMBS_IN_ACCUMULATOR];
+} BmbTaskOutputData_S;
 
 /* ==================================================================== */
 /* =================== GLOBAL FUNCTION DECLARATIONS =================== */
 /* ==================================================================== */
 
-void updatePackTelemetry();
-void updateTestData();
+void initBmbUpdateTask();
+void runBmbUpdateTask();
 
-#endif /* INC_BMS_H_ */
+#endif /* INC_BMBUPDATETASK_H_ */

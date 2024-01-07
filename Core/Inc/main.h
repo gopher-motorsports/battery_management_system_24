@@ -31,6 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "bmbUpdateTask.h"
 
 /* USER CODE END Includes */
 
@@ -73,6 +74,8 @@ void Error_Handler(void);
 #define PORTA_CS_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+
+extern BmbTaskOutputData_S bmbTaskOutputData;
 
 /* USER CODE END Private defines */
 

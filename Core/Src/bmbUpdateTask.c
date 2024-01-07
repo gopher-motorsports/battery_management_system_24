@@ -1,36 +1,39 @@
 /* ==================================================================== */
 /* ============================= INCLUDES ============================= */
 /* ==================================================================== */
+
 #include <stdbool.h>
 #include <string.h>
-#include "bmb.h"
-#include "adbms6830.h"
+
+#include "bmbUpdateTask.h"
+#include "main.h"
+#include "cmsis_os.h"
 
 /* ==================================================================== */
 /* ============================= DEFINES ============================== */
 /* ==================================================================== */
 
-#define CMD_START_ADC       0x0360           
+#define CMD_START_ADC           0x0360           
 
-#define READ_VOLT_REG_A     0x0044
-#define READ_VOLT_REG_B     0x0046
-#define READ_VOLT_REG_C     0x0048
-#define READ_VOLT_REG_D     0x004A
-#define READ_VOLT_REG_E     0x0049
-#define READ_VOLT_REG_F     0x004B
-#define NUM_VOLT_REG        6
+#define READ_VOLT_REG_A         0x0044
+#define READ_VOLT_REG_B         0x0046
+#define READ_VOLT_REG_C         0x0048
+#define READ_VOLT_REG_D         0x004A
+#define READ_VOLT_REG_E         0x0049
+#define READ_VOLT_REG_F         0x004B
+#define NUM_VOLT_REG            6
 
-#define CELLS_PER_REG       3
-#define CELL_REG_SIZE       REGISTER_SIZE_BYTES / CELLS_PER_REG
+#define CELLS_PER_REG           3
+#define CELL_REG_SIZE           REGISTER_SIZE_BYTES / CELLS_PER_REG
 
 #define ADC_RESOLUTION_BITS     16
 #define MAX_ADC_READING         0xFFFF
 #define ADC_RESOLUTION          0.00015f
 #define ADC_OFFSET              1.5f
 
-#define RAILED_MARGIN_BITS  2500
+#define RAILED_MARGIN_BITS      2500
 
-#define TEST_REG    0x002C
+#define TEST_REG                0x002C
 
 /* ==================================================================== */
 /* ========================= LOCAL VARIABLES ========================== */
@@ -48,6 +51,8 @@ uint16_t readVoltReg[NUM_VOLT_REG] =
 /* ==================================================================== */
 
 static bool isAdcRailed(uint16_t rawAdc);
+static void updateBmbTelemetry(Bmb_S* bmb);
+static void updateTestData(Bmb_S* bmb);
 
 /* ==================================================================== */
 /* =================== LOCAL FUNCTION DEFINITIONS ===================== */
@@ -64,11 +69,7 @@ static bool isAdcRailed(uint16_t rawAdc)
     return ((rawAdc < RAILED_MARGIN_BITS) || (rawAdc > (MAX_ADC_READING - RAILED_MARGIN_BITS)));
 }
 
-/* ==================================================================== */
-/* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
-/* ==================================================================== */
-
-void updateBmbTelemetry(Bmb_S* bmb, uint32_t numBmbs)
+static void updateBmbTelemetry(Bmb_S* bmb)
 {
     // TODO add polling to check scan status - prevent initialization error 
 
@@ -76,10 +77,10 @@ void updateBmbTelemetry(Bmb_S* bmb, uint32_t numBmbs)
     {
         uint8_t registerData[REGISTER_SIZE_BYTES];
         memset(registerData, 0, REGISTER_SIZE_BYTES);
-        readAll(readVoltReg[i], numBmbs, registerData);
+        readAll(readVoltReg[i], NUM_BMBS_IN_ACCUMULATOR, registerData);
         for(int32_t j = 0; j < CELLS_PER_REG; j++)
         {
-            for(int32_t k = 0; k < numBmbs; k++)
+            for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
             {
                 uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
                 uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
@@ -96,10 +97,11 @@ void updateBmbTelemetry(Bmb_S* bmb, uint32_t numBmbs)
             }
         }
     }
+
     uint8_t registerData[REGISTER_SIZE_BYTES];
     memset(registerData, 0, REGISTER_SIZE_BYTES);
-    readAll(readVoltReg[5], numBmbs, registerData);
-    for(int32_t k = 0; k < numBmbs; k++)
+    readAll(readVoltReg[5], NUM_BMBS_IN_ACCUMULATOR, registerData);
+    for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
     {
         uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES)];
         uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + 1];
@@ -115,13 +117,11 @@ void updateBmbTelemetry(Bmb_S* bmb, uint32_t numBmbs)
         }
     }
 
-    commandAll(CMD_START_ADC, numBmbs);
+    commandAll(CMD_START_ADC, NUM_BMBS_IN_ACCUMULATOR);
 }
 
-void testRead(Bmb_S* bmb, uint32_t numBmbs)
+static void updateTestData(Bmb_S* bmb)
 {
-    wakeChain(numBmbs);
-
     uint8_t registerData[REGISTER_SIZE_BYTES];
     memset(registerData, 0, REGISTER_SIZE_BYTES);
     static uint8_t data[6] = {0x01, 0x00, 0x00, 0x03, 0x01, 0x00};
@@ -129,12 +129,38 @@ void testRead(Bmb_S* bmb, uint32_t numBmbs)
     ioSet++;
     data[4] = ioSet;
 
-    writeAll(0x0001, numBmbs, data);
-    bmb[0].status = readAll(0x0002, numBmbs, registerData);
+    writeAll(0x0001, NUM_BMBS_IN_ACCUMULATOR, data);
+    bmb[0].status = readAll(0x0002, NUM_BMBS_IN_ACCUMULATOR, registerData);
     
     for(int32_t i = 0; i < REGISTER_SIZE_BYTES; i++)
     {
-        // bmb[0].testData[i] = 0x02;
         bmb[0].testData[i] = registerData[i];
     }
+}
+
+/* ==================================================================== */
+/* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
+/* ==================================================================== */
+
+void initBmbUpdateTask()
+{
+    HAL_GPIO_WritePin(MAS1_GPIO_Port, MAS1_Pin, SET);
+    HAL_GPIO_WritePin(MAS2_GPIO_Port, MAS2_Pin, SET);
+
+    wakeChain(NUM_BMBS_IN_ACCUMULATOR);
+    commandAll(CMD_START_ADC, NUM_BMBS_IN_ACCUMULATOR);
+}
+
+void runBmbUpdateTask()
+{
+    BmbTaskOutputData_S bmbTaskOutputDataLocal;
+
+    wakeChain(NUM_BMBS_IN_ACCUMULATOR);
+    updateBmbTelemetry(bmbTaskOutputDataLocal.bmb);
+    updateTestData(bmbTaskOutputDataLocal.bmb);
+
+    taskENTER_CRITICAL();
+    bmbTaskOutputData = bmbTaskOutputDataLocal;
+    taskEXIT_CRITICAL();
+
 }
