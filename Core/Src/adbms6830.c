@@ -34,7 +34,7 @@
 #define TRANSACTION_ATTEMPTS    3
 #define SPI_TIMEOUT_MS          10
 
-#define DUAL_TRANSACTIONS_BEFORE_RETRY  20
+#define DUAL_TRANSACTIONS_BEFORE_RETRY  100
 
 #define RESET_COMMAND_COUNTER_ADDRESS   0x002E
 #define READ_SERIAL_ID_COMMAND          0x002C
@@ -73,6 +73,8 @@ typedef struct
     uint8_t availableBmbs[NUM_PORTS];
     uint16_t localCommandCounter[NUM_PORTS];
 } CHAIN_INFO_S;
+
+typedef TRANSACTION_STATUS_E (*transactionPtr)(uint16_t, uint32_t, uint8_t*, PORT_E);
 
 /* ==================================================================== */
 /* ============================ CRC TABLES ============================ */
@@ -141,9 +143,9 @@ static uint16_t calculateDataCrc(uint8_t *packet, uint32_t numBytes, uint8_t com
 static TRANSACTION_STATUS_E sendCommand(uint16_t command, uint32_t numBmbs, PORT_E port);
 static TRANSACTION_STATUS_E writeRegister(uint16_t command, uint32_t numBmbs, uint8_t *txBuffer, PORT_E port);
 static TRANSACTION_STATUS_E readRegister(uint16_t command, uint32_t numBmbs, uint8_t *rxBuffer, PORT_E port);
-static TRANSACTION_STATUS_E sendAndVerifyCommand(uint16_t command, uint32_t numBmbs, PORT_E port);
+static TRANSACTION_STATUS_E sendAndVerifyCommand(uint16_t command, uint32_t numBmbs, uint8_t* buffer, PORT_E port);
 static TRANSACTION_STATUS_E writeAndVerifyRegister(uint16_t command, uint32_t numBmbs, uint8_t *txBuffer, PORT_E port);
-// static TRANSACTION_STATUS_E sendMessageChain(TRANSACTION_STATUS_E (*fn)(), uint16_t command, uint32_t numBmbs, uint8_t *dataBuffer);
+static TRANSACTION_STATUS_E sendMessageBmbChain(transactionPtr transaction, uint16_t command, uint32_t numBmbs, uint8_t *dataBuffer);
 static TRANSACTION_STATUS_E enumerateBmbs(uint32_t numBmbs);
 
 /* ==================================================================== */
@@ -386,7 +388,7 @@ static TRANSACTION_STATUS_E readRegister(uint16_t command, uint32_t numBmbs, uin
     return TRANSACTION_CRC_ERROR;
 }
 
-static TRANSACTION_STATUS_E sendAndVerifyCommand(uint16_t command, uint32_t numBmbs, PORT_E port)
+static TRANSACTION_STATUS_E sendAndVerifyCommand(uint16_t command, uint32_t numBmbs, uint8_t* buffer, PORT_E port)
 {
     for(int32_t cmdAttempt = 0; cmdAttempt < TRANSACTION_ATTEMPTS; cmdAttempt++)
     {
@@ -505,76 +507,76 @@ static TRANSACTION_STATUS_E writeAndVerifyRegister(uint16_t command, uint32_t nu
     return TRANSACTION_COMMAND_COUNTER_ERROR;
 }
 
-// static TRANSACTION_STATUS_E sendMessageChain(TRANSACTION_STATUS_E (*fn)(), uint16_t command, uint32_t numBmbs, uint8_t *dataBuffer)
-// {
-//     for(int32_t i = 0; i < 2; i++)
-//     {
-//         if(chainInfo.chainStatus == CHAIN_COMPLETE)
-//         {
-//             TRANSACTION_STATUS_E cmdStatus = fn(command, numBmbs, dataBuffer, originPort);
+static TRANSACTION_STATUS_E sendMessageBmbChain(transactionPtr transaction, uint16_t command, uint32_t numBmbs, uint8_t *dataBuffer)
+{
+    for(int32_t i = 0; i < 2; i++)
+    {
+        if(chainInfo.chainStatus == CHAIN_COMPLETE)
+        {
+            TRANSACTION_STATUS_E cmdStatus = transaction(command, numBmbs, dataBuffer, originPort);
 
-//             if(cmdStatus == TRANSACTION_SUCCESS)
-//             {
-//                 // On a transaction success, swap origin port, and return success
-//                 originPort = !originPort;
-//                 return TRANSACTION_SUCCESS;
-//             }
-//             else if(cmdStatus != TRANSACTION_CRC_ERROR)
-//             {
-//                 return cmdStatus;
-//             }
-//         }
-//         else
-//         {
-//             // If there are any chain breaks, use both ports to reach as many bmbs as possible
-//             TRANSACTION_STATUS_E portAStatus = (chainInfo.availableBmbs[PORTA] > 0) ? (fn(command, chainInfo.availableBmbs[PORTA], dataBuffer, PORTA)) : (TRANSACTION_SUCCESS);
-//             TRANSACTION_STATUS_E portBStatus = (chainInfo.availableBmbs[PORTB] > 0) ? (fn(command, chainInfo.availableBmbs[PORTB], dataBuffer, PORTB)) : (TRANSACTION_SUCCESS); 
+            if(cmdStatus == TRANSACTION_SUCCESS)
+            {
+                // On a transaction success, swap origin port, and return success
+                originPort = !originPort;
+                return TRANSACTION_SUCCESS;
+            }
+            else if(cmdStatus != TRANSACTION_CRC_ERROR)
+            {
+                return cmdStatus;
+            }
+        }
+        else
+        {
+            // If there are any chain breaks, use both ports to reach as many bmbs as possible
+            TRANSACTION_STATUS_E portAStatus = (chainInfo.availableBmbs[PORTA] > 0) ? (transaction(command, chainInfo.availableBmbs[PORTA], dataBuffer, PORTA)) : (TRANSACTION_SUCCESS);
+            TRANSACTION_STATUS_E portBStatus = (chainInfo.availableBmbs[PORTB] > 0) ? (transaction(command, chainInfo.availableBmbs[PORTB], dataBuffer, PORTB)) : (TRANSACTION_SUCCESS); 
 
-//             if((portAStatus == TRANSACTION_SUCCESS) && (portBStatus == TRANSACTION_SUCCESS))
-//             {
-//                 if(chainInfo.chainStatus == SINGLE_CHAIN_BREAK)
-//                 {
-//                     dualTransactions++;
-//                     if(dualTransactions > DUAL_TRANSACTIONS_BEFORE_RETRY)
-//                     {
-//                         dualTransactions = 0;
-//                         TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-//                         if(countStatus != TRANSACTION_SUCCESS)
-//                         {
-//                             return countStatus;
-//                         }
-//                     }
-//                     // If every bmb is successfully reached, return success
-//                     return TRANSACTION_SUCCESS; 
-//                 }
-//                 else
-//                 {
-//                     // If not every bmb is successfully reached, re-enumerate and return failure
-//                     TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-//                     if(countStatus != TRANSACTION_SUCCESS)
-//                     {
-//                         return countStatus;
-//                     }
-//                     return TRANSACTION_CRC_ERROR;
-//                 }
-//             }
+            if((portAStatus == TRANSACTION_SUCCESS) && (portBStatus == TRANSACTION_SUCCESS))
+            {
+                if(chainInfo.chainStatus == SINGLE_CHAIN_BREAK)
+                {
+                    dualTransactions++;
+                    if(dualTransactions > DUAL_TRANSACTIONS_BEFORE_RETRY)
+                    {
+                        dualTransactions = 0;
+                        TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
+                        if(countStatus != TRANSACTION_SUCCESS)
+                        {
+                            return countStatus;
+                        }
+                    }
+                    // If every bmb is successfully reached, return success
+                    return TRANSACTION_SUCCESS; 
+                }
+                else
+                {
+                    // If not every bmb is successfully reached, re-enumerate and return failure
+                    TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
+                    if(countStatus != TRANSACTION_SUCCESS)
+                    {
+                        return countStatus;
+                    }
+                    return TRANSACTION_CRC_ERROR;
+                }
+            }
 
-//             for(TRANSACTION_STATUS_E errorStatus = 1; errorStatus < TRANSACTION_SUCCESS; errorStatus++)
-//             {
-//                 if((portAStatus == errorStatus) || (portBStatus == errorStatus))
-//                 {
-//                     return errorStatus;
-//                 }
-//             }
-//         }
-//         TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-//         if(countStatus != TRANSACTION_SUCCESS)
-//         {
-//             return countStatus;
-//         }
-//     }
-//     return TRANSACTION_CRC_ERROR;
-// }
+            for(TRANSACTION_STATUS_E errorStatus = 1; errorStatus < TRANSACTION_SUCCESS; errorStatus++)
+            {
+                if((portAStatus == errorStatus) || (portBStatus == errorStatus))
+                {
+                    return errorStatus;
+                }
+            }
+        }
+        TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
+        if(countStatus != TRANSACTION_SUCCESS)
+        {
+            return countStatus;
+        }
+    }
+    return TRANSACTION_CRC_ERROR;
+}
 
 static TRANSACTION_STATUS_E enumerateBmbs(uint32_t numBmbs)
 {
@@ -654,213 +656,15 @@ void wakeChain(uint32_t numBmbs)
 
 TRANSACTION_STATUS_E commandAll(uint16_t command, uint32_t numBmbs)
 {
-    for(int32_t i = 0; i < 2; i++)
-    {
-        if(chainInfo.chainStatus == CHAIN_COMPLETE)
-        {
-            TRANSACTION_STATUS_E cmdStatus = sendAndVerifyCommand(command, numBmbs, originPort);
-
-            if(cmdStatus == TRANSACTION_SUCCESS)
-            {
-                // On a transaction success, swap origin port, and return success
-                originPort = !originPort;
-                return TRANSACTION_SUCCESS;
-            }
-            else if(cmdStatus != TRANSACTION_CRC_ERROR)
-            {
-                return cmdStatus;
-            }
-        }
-        else
-        {
-            // If there are any chain breaks, use both ports to reach as many bmbs as possible
-            TRANSACTION_STATUS_E portAStatus = (chainInfo.availableBmbs[PORTA] > 0) ? (sendAndVerifyCommand(command, chainInfo.availableBmbs[PORTA], PORTA)) : (TRANSACTION_SUCCESS);
-            TRANSACTION_STATUS_E portBStatus = (chainInfo.availableBmbs[PORTB] > 0) ? (sendAndVerifyCommand(command, chainInfo.availableBmbs[PORTB], PORTB)) : (TRANSACTION_SUCCESS); 
-
-            if((portAStatus == TRANSACTION_SUCCESS) && (portBStatus == TRANSACTION_SUCCESS))
-            {
-                if(chainInfo.chainStatus == SINGLE_CHAIN_BREAK)
-                {
-                    dualTransactions++;
-                    if(dualTransactions > DUAL_TRANSACTIONS_BEFORE_RETRY)
-                    {
-                        dualTransactions = 0;
-                        TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-                        if(countStatus != TRANSACTION_SUCCESS)
-                        {
-                            return countStatus;
-                        }
-                    }
-                    // If every bmb is successfully reached, return success
-                    return TRANSACTION_SUCCESS; 
-                }
-                else
-                {
-                    // If not every bmb is successfully reached, re-enumerate and return failure
-                    TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-                    if(countStatus != TRANSACTION_SUCCESS)
-                    {
-                        return countStatus;
-                    }
-                    return TRANSACTION_CRC_ERROR;
-                }
-            }
-
-            for(TRANSACTION_STATUS_E errorStatus = 1; errorStatus < TRANSACTION_SUCCESS; errorStatus++)
-            {
-                if((portAStatus == errorStatus) || (portBStatus == errorStatus))
-                {
-                    return errorStatus;
-                }
-            }
-        }
-        TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-        if(countStatus != TRANSACTION_SUCCESS)
-        {
-            return countStatus;
-        }
-    }
-    return TRANSACTION_CRC_ERROR;
+    return sendMessageBmbChain(sendAndVerifyCommand, command, numBmbs, NULL);
 }
 
 TRANSACTION_STATUS_E writeAll(uint16_t command, uint32_t numBmbs, uint8_t *txData)
 { 
-    for(int32_t i = 0; i < 2; i++)
-    {
-        if(chainInfo.chainStatus == CHAIN_COMPLETE)
-        {
-            TRANSACTION_STATUS_E cmdStatus = writeAndVerifyRegister(command, numBmbs, txData, originPort);
-
-            if(cmdStatus == TRANSACTION_SUCCESS)
-            {
-                // On a transaction success, swap origin port, and return success
-                originPort = !originPort;
-                return TRANSACTION_SUCCESS;
-            }
-            else if(cmdStatus != TRANSACTION_CRC_ERROR)
-            {
-                return cmdStatus;
-            }
-        }
-        else
-        {
-            // If there are any chain breaks, use both ports to reach as many bmbs as possible
-            TRANSACTION_STATUS_E portAStatus = (chainInfo.availableBmbs[PORTA] > 0) ? (writeAndVerifyRegister(command, chainInfo.availableBmbs[PORTA], txData, PORTA)) : (TRANSACTION_SUCCESS);
-            TRANSACTION_STATUS_E portBStatus = (chainInfo.availableBmbs[PORTB] > 0) ? (writeAndVerifyRegister(command, chainInfo.availableBmbs[PORTB], txData, PORTB)) : (TRANSACTION_SUCCESS); 
-
-            if((portAStatus == TRANSACTION_SUCCESS) && (portBStatus == TRANSACTION_SUCCESS))
-            {
-                if(chainInfo.chainStatus == SINGLE_CHAIN_BREAK)
-                {
-                    dualTransactions++;
-                    if(dualTransactions > DUAL_TRANSACTIONS_BEFORE_RETRY)
-                    {
-                        dualTransactions = 0;
-                        TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-                        if(countStatus != TRANSACTION_SUCCESS)
-                        {
-                            return countStatus;
-                        }
-                    }
-                    // If every bmb is successfully reached, return success
-                    return TRANSACTION_SUCCESS; 
-                }
-                else
-                {
-                    // If not every bmb is successfully reached, re-enumerate and return failure
-                    TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-                    if(countStatus != TRANSACTION_SUCCESS)
-                    {
-                        return countStatus;
-                    }
-                    return TRANSACTION_CRC_ERROR;
-                }
-            }
-
-            for(TRANSACTION_STATUS_E errorStatus = 1; errorStatus < TRANSACTION_SUCCESS; errorStatus++)
-            {
-                if((portAStatus == errorStatus) || (portBStatus == errorStatus))
-                {
-                    return errorStatus;
-                }
-            }
-        }
-        TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-        if(countStatus != TRANSACTION_SUCCESS)
-        {
-            return countStatus;
-        }
-    }
-    return TRANSACTION_CRC_ERROR;
+    return sendMessageBmbChain(writeAndVerifyRegister, command, numBmbs, txData);
 }
 
 TRANSACTION_STATUS_E readAll(uint16_t command, uint32_t numBmbs, uint8_t *rxData)
 { 
-    for(int32_t i = 0; i < 2; i++)
-    {
-        if(chainInfo.chainStatus == CHAIN_COMPLETE)
-        {
-            TRANSACTION_STATUS_E cmdStatus = readRegister(command, numBmbs, rxData, originPort);
-
-            if(cmdStatus == TRANSACTION_SUCCESS)
-            {
-                // On a transaction success, swap origin port, and return success
-                originPort = !originPort;
-                return TRANSACTION_SUCCESS;
-            }
-            else if(cmdStatus != TRANSACTION_CRC_ERROR)
-            {
-                return cmdStatus;
-            }
-        }
-        else
-        {
-            // If there are any chain breaks, use both ports to reach as many bmbs as possible
-            TRANSACTION_STATUS_E portAStatus = (chainInfo.availableBmbs[PORTA] > 0) ? (readRegister(command, chainInfo.availableBmbs[PORTA], rxData, PORTA)) : (TRANSACTION_SUCCESS);
-            TRANSACTION_STATUS_E portBStatus = (chainInfo.availableBmbs[PORTB] > 0) ? (readRegister(command, chainInfo.availableBmbs[PORTB], rxData, PORTB)) : (TRANSACTION_SUCCESS); 
-
-            if((portAStatus == TRANSACTION_SUCCESS) && (portBStatus == TRANSACTION_SUCCESS))
-            {
-                if(chainInfo.chainStatus == SINGLE_CHAIN_BREAK)
-                {
-                    dualTransactions++;
-                    if(dualTransactions > DUAL_TRANSACTIONS_BEFORE_RETRY)
-                    {
-                        dualTransactions = 0;
-                        TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-                        if(countStatus != TRANSACTION_SUCCESS)
-                        {
-                            return countStatus;
-                        }
-                    }
-                    // If every bmb is successfully reached, return success
-                    return TRANSACTION_SUCCESS; 
-                }
-                else
-                {
-                    // If not every bmb is successfully reached, re-enumerate and return failure
-                    TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-                    if(countStatus != TRANSACTION_SUCCESS)
-                    {
-                        return countStatus;
-                    }
-                    return TRANSACTION_CRC_ERROR;
-                }
-            }
-
-            for(TRANSACTION_STATUS_E errorStatus = 1; errorStatus < TRANSACTION_SUCCESS; errorStatus++)
-            {
-                if((portAStatus == errorStatus) || (portBStatus == errorStatus))
-                {
-                    return errorStatus;
-                }
-            }
-        }
-        TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
-        if(countStatus != TRANSACTION_SUCCESS)
-        {
-            return countStatus;
-        }
-    }
-    return TRANSACTION_CRC_ERROR;
+    return sendMessageBmbChain(readRegister, command, numBmbs, rxData);
 }
