@@ -40,7 +40,7 @@ void initMain()
 
 void runMain()
 {
-    // updatePackTelemetry();
+    updatePackTelemetry();
     updateTestData();
 
     static uint32_t lastUpdateMain = 0;
@@ -48,12 +48,15 @@ void runMain()
     {
         lastUpdateMain = HAL_GetTick();
         printf("\e[1;1H\e[2J");
-        // printCellVoltages();
+        printCellVoltages();
+        printf("\n");
         printf("Test Read Result: \n");
         for(int32_t i = 0; i < 6; i++)
         {
             printf("%X\n", gBms.bmb[0].testData[i]);
         }
+
+        printf("STATUS: %lu\n", (uint32_t)gBms.bmb[0].status);
         
     }
 }
@@ -74,7 +77,8 @@ static void printCellVoltages()
         {
             if(gBms.bmb[j].cellVoltageStatus[i] == GOOD)
             {
-                printf("  %5.3f", (double)gBms.bmb[j].cellVoltage[i]);
+                printf("  %5.3f  ", (double)gBms.bmb[j].cellVoltage[i]);
+                // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
             }
             else
             {

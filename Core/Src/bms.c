@@ -21,20 +21,20 @@ Bms_S gBms;
 /* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
 /* ==================================================================== */
 
-// void updatePackTelemetry()
-// {
-//     static uint32_t lastBmbUpdate = 0;
-//     if((HAL_GetTick() - lastBmbUpdate) > BMB_UPDATE_PERIOD_MS)
-//     {
-//         lastBmbUpdate = HAL_GetTick();
-//         updateBmbTelemetry(gBms.bmb, NUM_BMBS_IN_ACCUMULATOR);
-//     }
-// }
+void updatePackTelemetry()
+{
+    static uint32_t lastBmbUpdate = 0;
+    if((HAL_GetTick() - lastBmbUpdate) > BMB_UPDATE_PERIOD_MS)
+    {
+        lastBmbUpdate = HAL_GetTick();
+        updateBmbTelemetry(gBms.bmb, NUM_BMBS_IN_ACCUMULATOR);
+    }
+}
 
 void updateTestData()
 {
     static uint32_t lastTestUpdate = 0;
-    if((HAL_GetTick() - lastTestUpdate) > 100)
+    if((HAL_GetTick() - lastTestUpdate) > 1000)
     {
         lastTestUpdate = HAL_GetTick();
         testRead(gBms.bmb, NUM_BMBS_IN_ACCUMULATOR);

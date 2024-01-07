@@ -23,7 +23,11 @@
 
 typedef enum
 {
-    TRANSACTION_FAIL = 0 ,
+    TRANSACTION_CRC_ERROR = 0,
+    TRANSACTION_SPI_ERROR,
+    TRANSACTION_POR_ERROR,
+    TRANSACTION_COMMAND_COUNTER_ERROR,
+    TRANSACTION_WRITE_REJECT,
     TRANSACTION_SUCCESS
 } TRANSACTION_STATUS_E;
 
@@ -33,8 +37,8 @@ typedef enum
 
 void wakeChain(uint32_t numBmbs);
 TRANSACTION_STATUS_E commandAll(uint16_t command, uint32_t numBmbs);
-TRANSACTION_STATUS_E writeAll(uint16_t command, uint8_t *txData, uint32_t numBmbs);
-TRANSACTION_STATUS_E readAll(uint16_t command, uint8_t *rxData, uint32_t numBmbs);
+TRANSACTION_STATUS_E writeAll(uint16_t command, uint32_t numBmbs, uint8_t *txData);
+TRANSACTION_STATUS_E readAll(uint16_t command, uint32_t numBmbs, uint8_t *rxData);
 
 #endif /* INC_ADBMS6830_H_ */
 

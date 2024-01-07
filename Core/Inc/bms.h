@@ -12,7 +12,7 @@
 /* ==================================================================== */
 
 #define NUM_BMBS_IN_ACCUMULATOR     1
-#define NUM_BRICKS_PER_BMB          18
+#define NUM_BRICKS_PER_BMB          16
 
 /* ==================================================================== */
 /* ========================= ENUMERATED TYPES========================== */
@@ -33,7 +33,7 @@ typedef struct Bms
 /* =================== GLOBAL FUNCTION DECLARATIONS =================== */
 /* ==================================================================== */
 
-// void updatePackTelemetry();
+void updatePackTelemetry();
 void updateTestData();
 
 #endif /* INC_BMS_H_ */
