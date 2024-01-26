@@ -51,8 +51,8 @@ uint16_t readVoltReg[NUM_VOLT_REG] =
 /* ==================================================================== */
 
 static bool isAdcRailed(uint16_t rawAdc);
-static void updateBmbTelemetry(Bmb_S* bmb);
-static void updateTestData(Bmb_S* bmb);
+static TRANSACTION_STATUS_E updateBmbTelemetry(Bmb_S* bmb);
+static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb);
 
 /* ==================================================================== */
 /* =================== LOCAL FUNCTION DEFINITIONS ===================== */
@@ -69,7 +69,7 @@ static bool isAdcRailed(uint16_t rawAdc)
     return ((rawAdc < RAILED_MARGIN_BITS) || (rawAdc > (MAX_ADC_READING - RAILED_MARGIN_BITS)));
 }
 
-static void updateBmbTelemetry(Bmb_S* bmb)
+static TRANSACTION_STATUS_E updateBmbTelemetry(Bmb_S* bmb)
 {
     // TODO add polling to check scan status - prevent initialization error 
 
@@ -118,9 +118,10 @@ static void updateBmbTelemetry(Bmb_S* bmb)
     }
 
     commandAll(CMD_START_ADC, NUM_BMBS_IN_ACCUMULATOR);
+    return TRANSACTION_SUCCESS;
 }
 
-static void updateTestData(Bmb_S* bmb)
+static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb)
 {
     uint8_t registerData[REGISTER_SIZE_BYTES];
     memset(registerData, 0, REGISTER_SIZE_BYTES);
@@ -136,6 +137,7 @@ static void updateTestData(Bmb_S* bmb)
     {
         bmb[0].testData[i] = registerData[i];
     }
+    return TRANSACTION_SUCCESS;
 }
 
 /* ==================================================================== */
@@ -154,6 +156,19 @@ void initBmbUpdateTask()
 void runBmbUpdateTask()
 {
     BmbTaskOutputData_S bmbTaskOutputDataLocal;
+
+    // for(int32_t i = 0; i < 1; i++)
+    // {
+
+    //     if(updateBmbTelemetry(bmbTaskOutputDataLocal.bmb) == TRANSACTION_POR_ERROR)
+    //     {
+            
+    //     }
+
+    //     // Re init section
+    //     // RE INIT
+
+    // }
 
     wakeChain(NUM_BMBS_IN_ACCUMULATOR);
     updateBmbTelemetry(bmbTaskOutputDataLocal.bmb);
