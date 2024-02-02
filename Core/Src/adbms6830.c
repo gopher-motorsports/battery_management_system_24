@@ -569,6 +569,7 @@ static TRANSACTION_STATUS_E sendMessageBmbChain(transactionPtr transaction, uint
                 }
             }
         }
+        wakeChain(numBmbs);
         TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
         if(countStatus != TRANSACTION_SUCCESS)
         {
