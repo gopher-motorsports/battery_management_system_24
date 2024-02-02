@@ -569,6 +569,7 @@ static TRANSACTION_STATUS_E sendMessageBmbChain(transactionPtr transaction, uint
                 }
             }
         }
+        wakeChain(numBmbs);
         TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
         if(countStatus != TRANSACTION_SUCCESS)
         {
@@ -582,6 +583,7 @@ static TRANSACTION_STATUS_E enumerateBmbs(uint32_t numBmbs)
 {
     // Create dummy buffer for read command  
     uint8_t rxBuff[numBmbs * REGISTER_SIZE_BYTES];
+    TRANSACTION_STATUS_E porErrorDetected = TRANSACTION_SUCCESS;
 
     // Attempt to read from an increasing number of bmbs from each port
     // Set availableBmbs to the number of bmbs reachable 
@@ -599,6 +601,10 @@ static TRANSACTION_STATUS_E enumerateBmbs(uint32_t numBmbs)
             else if(readStatus == TRANSACTION_SPI_ERROR)
             {
                 return TRANSACTION_SPI_ERROR;
+            }
+            else if(readStatus == TRANSACTION_POR_ERROR)
+            {
+                porErrorDetected = TRANSACTION_POR_ERROR; 
             }
         }
     }
@@ -619,7 +625,8 @@ static TRANSACTION_STATUS_E enumerateBmbs(uint32_t numBmbs)
         // If multiple chain breaks are detected, LOST_COMMS is set
         chainInfo.chainStatus = MULTIPLE_CHAIN_BREAK;
     }
-    return TRANSACTION_SUCCESS;
+    return porErrorDetected;
+
 }
 
 // /* ==================================================================== */
