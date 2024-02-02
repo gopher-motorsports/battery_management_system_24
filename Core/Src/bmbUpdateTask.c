@@ -137,30 +137,6 @@ static void getCellTemps(Bmb_S* bmb){
 
 }
 
-static void getCellTemps(Bmb_S* bmb){
-
-    
-    uint8_t new16BitIndex = 0;
-    uint8_t tempBufIndex = 0;
-    uint8_t tempBuf[REGISTER_SIZE_BYTES];
-    memset(tempBuf, 0, sizeof(uint8_t)*REGISTER_SIZE_BYTES);
-    
-
-    for(int32_t j = 0; j < NUM_THERM_REG_GRPS-1; j++)
-        {   
-            readAll(readThermReg[j], NUM_BMBS_IN_ACCUMULATOR, tempBuf);
-
-            //put both 8bit reg values into a single 16bit element
-            while(new16BitIndex < REGISTER_SIZE_BYTES/2){
-                bmb->thermRegVal[new16BitIndex+((new16BitIndex%2)*sizeof(uint8_t))] = tempBuf[tempBufIndex];
-                if(new16BitIndex%2-1 == 0)
-                    new16BitIndex++;
-                tempBufIndex++;
-            }
-
-        }
-
-}
 
 static bool initBmbs()
 {
