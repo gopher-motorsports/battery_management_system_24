@@ -112,28 +112,36 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb);
 /* =================== LOCAL FUNCTION DEFINITIONS ===================== */
 /* ==================================================================== */
 
+/*
+@
+*/
+
 static void getCellTemps(Bmb_S* bmb){
 
     
-    uint8_t new16BitIndex = 0;
-    uint8_t tempBufIndex = 0;
-    uint8_t tempBuf[REGISTER_SIZE_BYTES];
-    memset(tempBuf, 0, sizeof(uint8_t)*REGISTER_SIZE_BYTES);
+    uint8_t thermalValIndex = 0;
+    uint8_t registerDataIndex = 0;
+    uint8_t registerData[REGISTER_SIZE_BYTES];
+    memset(registerData, 0, sizeof(uint8_t)*REGISTER_SIZE_BYTES);
     
+    //!!!!!!!!!this conversion needs to be its own function in some utils file for readability!!!!!!!!!!
+    for(int32_t j = 0; j < NUM_THERM_REG_GRPS; j++)
+    {   
+        readAll(readThermReg[j], NUM_BMBS_IN_ACCUMULATOR, registerData);
 
-    for(int32_t j = 0; j < NUM_THERM_REG_GRPS-1; j++)
-        {   
-            readAll(readThermReg[j], NUM_BMBS_IN_ACCUMULATOR, tempBuf);
-
-            //put both 8bit reg values into a single 16bit element
-            while(new16BitIndex < REGISTER_SIZE_BYTES/2){
-                bmb->thermRegVal[new16BitIndex+((new16BitIndex%2)*sizeof(uint8_t))] = tempBuf[tempBufIndex];
-                if(new16BitIndex%2-1 == 0)
-                    new16BitIndex++;
-                tempBufIndex++;
-            }
-
+        //put both 8bit reg values into a single 16bit element
+        while(thermalValIndex < REGISTER_SIZE_BYTES/2){
+            bmb->thermRegVal[thermalValIndex+((thermalValIndex%2)*sizeof(uint8_t))] = registerData[registerDataIndex];
+            if(thermalValIndex%2-1 == 0)
+                thermalValIndex++;
+            registerDataIndex++;
         }
+
+    }
+    for(int8_t i = 0; i < NUM_CELLS_PER_BMB/2; i++)
+    {
+        bmb->cellTemp[i] = lookup(CONVERT_16_BIT_ADC(bmb->thermRegVal[i]), temperatureArray);
+    }
 
 }
 
