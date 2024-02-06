@@ -17,8 +17,6 @@
 
 #define CMD_START_ADC           0x0360           
 
-
-
 #define READ_VOLT_REG_A         0x0044
 #define READ_VOLT_REG_B         0x0046
 #define READ_VOLT_REG_C         0x0048
@@ -26,12 +24,6 @@
 #define READ_VOLT_REG_E         0x0049
 #define READ_VOLT_REG_F         0x004B
 #define NUM_VOLT_REG            6
-
-#define READ_THERM_REG_A        0x0019
-#define READ_THERM_REG_B        0x001A
-#define READ_THERM_REG_C        0x001B
-#define READ_THERM_REG_D        0x001F
-#define NUM_THERM_REG_GRPS      4
 
 #define CELLS_PER_REG           3
 #define CELL_REG_SIZE           REGISTER_SIZE_BYTES / CELLS_PER_REG
@@ -48,14 +40,8 @@
 #define TEST_REG                0x002C
 
 /* ==================================================================== */
-/* ========================= LOCAL VARIABLES ========================= */
+/* ========================= LOCAL VARIABLES ========================== */
 /* ==================================================================== */
-
-uint16_t readThermReg[NUM_THERM_REG_GRPS] =
-{
-    READ_THERM_REG_A, READ_THERM_REG_B,
-    READ_THERM_REG_C, READ_THERM_REG_D
-};
 
 uint16_t readVoltReg[NUM_VOLT_REG] =
 {
@@ -70,7 +56,6 @@ bool bmbsInit = false;
 /* =================== LOCAL FUNCTION DECLARATIONS ==================== */
 /* ==================================================================== */
 
-static void getCellTemps();
 static bool initBmbs();
 static TRANSACTION_STATUS_E updateBmbTelemetry(Bmb_S* bmb);
 static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb);
@@ -111,56 +96,6 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb);
 /* ==================================================================== */
 /* =================== LOCAL FUNCTION DEFINITIONS ===================== */
 /* ==================================================================== */
-
-static void getCellTemps(Bmb_S* bmb){
-
-    
-    uint8_t new16BitIndex = 0;
-    uint8_t tempBufIndex = 0;
-    uint8_t tempBuf[REGISTER_SIZE_BYTES];
-    memset(tempBuf, 0, sizeof(uint8_t)*REGISTER_SIZE_BYTES);
-    
-
-    for(int32_t j = 0; j < NUM_THERM_REG_GRPS-1; j++)
-        {   
-            readAll(readThermReg[j], NUM_BMBS_IN_ACCUMULATOR, tempBuf);
-
-            //put both 8bit reg values into a single 16bit element
-            while(new16BitIndex < REGISTER_SIZE_BYTES/2){
-                bmb->thermRegVal[new16BitIndex+((new16BitIndex%2)*sizeof(uint8_t))] = tempBuf[tempBufIndex];
-                if(new16BitIndex%2-1 == 0)
-                    new16BitIndex++;
-                tempBufIndex++;
-            }
-
-        }
-
-}
-
-static void getCellTemps(Bmb_S* bmb){
-
-    
-    uint8_t new16BitIndex = 0;
-    uint8_t tempBufIndex = 0;
-    uint8_t tempBuf[REGISTER_SIZE_BYTES];
-    memset(tempBuf, 0, sizeof(uint8_t)*REGISTER_SIZE_BYTES);
-    
-
-    for(int32_t j = 0; j < NUM_THERM_REG_GRPS-1; j++)
-        {   
-            readAll(readThermReg[j], NUM_BMBS_IN_ACCUMULATOR, tempBuf);
-
-            //put both 8bit reg values into a single 16bit element
-            while(new16BitIndex < REGISTER_SIZE_BYTES/2){
-                bmb->thermRegVal[new16BitIndex+((new16BitIndex%2)*sizeof(uint8_t))] = tempBuf[tempBufIndex];
-                if(new16BitIndex%2-1 == 0)
-                    new16BitIndex++;
-                tempBufIndex++;
-            }
-
-        }
-
-}
 
 static bool initBmbs()
 {
