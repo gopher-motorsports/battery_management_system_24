@@ -51,6 +51,7 @@ typedef enum
       { \
         /* If SPI fails to start, HAL must abort transaction. SPI retries */ \
         HAL_SPI_Abort_IT(hspi); \
+        notificationFlags = SPI_ERROR; \
         continue; \
       } \
       /* Wait for SPI interrupt to occur. NotificationFlags will hold notification value indicating status of transaction */ \
@@ -58,6 +59,7 @@ typedef enum
       { \
         /* If no SPI interrupt occurs in time, transaction is aborted to prevent any longer delay */\
         HAL_SPI_Abort_IT(hspi); \
+        notificationFlags = SPI_TIMEOUT; \
         break; \
       } \
       /* If SPI SUCCESS bit is not set in notification value, SPI error has occured. SPI retries */ \

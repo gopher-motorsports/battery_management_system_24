@@ -110,6 +110,7 @@ static bool initBmbs()
         Debug("BMBs failed to initialize!\n");
         return false;
     }
+    Debug("BMB initialization successful!\n");
     return true;
 }
 
