@@ -31,10 +31,18 @@ typedef enum
 
 typedef struct
 {   
-    float cellVoltage[NUM_CELLS_PER_BMB];
     uint8_t testData[6];
     TRANSACTION_STATUS_E status;
+
     SENSOR_STATUS_E cellVoltageStatus[NUM_CELLS_PER_BMB];
+    float cellVoltage[NUM_CELLS_PER_BMB];
+
+    SENSOR_STATUS_E cellTempStatus[NUM_CELLS_PER_BMB];
+    float cellTemp[NUM_CELLS_PER_BMB];
+
+    SENSOR_STATUS_E boardTempStatus;
+    float boardTemp;
+    
 } Bmb_S;
 
 typedef struct
