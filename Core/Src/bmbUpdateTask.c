@@ -111,14 +111,9 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb);
 
 #define HANDLE_BMB_ERROR(error) \
     if(error != TRANSACTION_SUCCESS) { \
-        if(error == TRANSACTION_CRC_ERROR) \
+        if(error == TRANSACTION_SPI_ERROR) \
         { \
-            Debug("Chain break!\n"); \
-            return; \
-        } \
-        else if(error == TRANSACTION_SPI_ERROR) \
-        { \
-            Debug("SPI Failure, reseting micro...\n"); \
+            Debug("SPI Failure, reseting STM32...\n"); \
             HAL_NVIC_SystemReset(); \
         } \
         else if(error == TRANSACTION_POR_ERROR) \
@@ -126,6 +121,23 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb);
             Debug("Power reset detected, reinitializing...\n"); \
             bmbsInit = initBmbs(); \
             return; \
+        } \
+        else if(error == TRANSACTION_CRC_ERROR) \
+        { \
+            Debug("Chain break!\n"); \
+            return; \
+        } \
+        else if(error == TRANSACTION_COMMAND_COUNTER_ERROR) \
+        { \
+            Debug("Command Counter Error!\n"); \
+        } \
+        else if(error == TRANSACTION_WRITE_REJECT) \
+        { \
+            Debug("Write Rejected!\n"); \
+        } \
+        else \
+        { \
+            Debug("Unknown Transaction Error\n"); \
         } \
     }
 

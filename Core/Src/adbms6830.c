@@ -72,6 +72,7 @@ typedef struct
     CHAIN_STATUS_E chainStatus;
     uint8_t availableBmbs[NUM_PORTS];
     uint16_t localCommandCounter[NUM_PORTS];
+    bool commandCounterError[NUM_PORTS];
 } CHAIN_INFO_S;
 
 typedef TRANSACTION_STATUS_E (*transactionPtr)(uint16_t, uint32_t, uint8_t*, PORT_E);
@@ -332,47 +333,48 @@ static TRANSACTION_STATUS_E readRegister(uint16_t command, uint32_t numBmbs, uin
 
     for(int32_t i = 0; i < TRANSACTION_ATTEMPTS; i++)
     {
+        // SPIify!
         openPort(port);
         if(SPI_TRANSMIT(HAL_SPI_TransmitReceive_IT, &hspi1, SPI_TIMEOUT_MS, txBuffer, rxBuffer, packetLength) != SPI_SUCCESS)
         {
+            // On SPI failure, immediately return SPI error 
             closePort(port);
             return TRANSACTION_SPI_ERROR;
         }
         closePort(port);
 
-        TRANSACTION_STATUS_E readStatus = TRANSACTION_SUCCESS;
         for(int32_t j = 0; j < numBmbs; j++)
         {
             // Extract the register data for each bmb into a temporary array
             uint8_t registerData[REGISTER_SIZE_BYTES];
             memcpy(registerData, rxBuffer + (COMMAND_PACKET_LENGTH + (j * REGISTER_PACKET_LENGTH)), REGISTER_SIZE_BYTES);
 
-            // Extract the CRC sent with the corresponding register data
+            // Extract the CRC and Command Counter sent with the corresponding register data
             uint16_t pec0 = rxBuffer[COMMAND_PACKET_LENGTH + (j * REGISTER_PACKET_LENGTH) + REGISTER_SIZE_BYTES];
             uint16_t pec1 = rxBuffer[COMMAND_PACKET_LENGTH + (j * REGISTER_PACKET_LENGTH) + REGISTER_SIZE_BYTES + 1];
             uint16_t registerCRC = ((pec0 << BITS_IN_BYTE) | (pec1)) & 0x03FF;
             uint8_t bmbCommandCounter = (uint8_t)pec0 >> (BITS_IN_BYTE - COMMAND_COUNTER_BITS);
 
-            // If the CRC is correct for the data sent, populate the rx data buffer with the register data
-            // Else, the data is not populated and defaults to zeros
+            // If the CRC is incorrect for the data sent, retry the spi transaction
             if(calculateDataCrc(registerData, REGISTER_SIZE_BYTES, bmbCommandCounter) != registerCRC)
             {
                 goto retry;
             }
 
+            // Check if the recieved command counter matches the local command counter
             if(bmbCommandCounter != chainInfo.localCommandCounter[port])
             {
+                // Log command counter mismatch
+                chainInfo.commandCounterError[port] = true;
+
+                // If remote command counter is 0, log power reset
                 if(bmbCommandCounter == 0)
                 {
-                    readStatus = TRANSACTION_POR_ERROR;
+                    return TRANSACTION_POR_ERROR;
                 }
-                else if(readStatus == TRANSACTION_SUCCESS)
-                {
-                    readStatus = TRANSACTION_COMMAND_COUNTER_ERROR;
-                }
-                
             }
 
+            // Populate rx buffer with local register data
             if(port == PORTA)
             {
                 memcpy(rxBuff + (j * REGISTER_SIZE_BYTES), registerData, REGISTER_SIZE_BYTES); 
@@ -382,7 +384,7 @@ static TRANSACTION_STATUS_E readRegister(uint16_t command, uint32_t numBmbs, uin
                 memcpy(rxBuff + ((numBmbs - j - 1) * REGISTER_SIZE_BYTES), registerData, REGISTER_SIZE_BYTES); 
             }
         }
-        return readStatus;
+        return TRANSACTION_SUCCESS;
         retry:;
     }
     return TRANSACTION_CRC_ERROR;
@@ -392,17 +394,20 @@ static TRANSACTION_STATUS_E sendAndVerifyCommand(uint16_t command, uint32_t numB
 {
     for(int32_t cmdAttempt = 0; cmdAttempt < TRANSACTION_ATTEMPTS; cmdAttempt++)
     {
+        // Send command packet
         if(sendCommand(command, numBmbs, port) == TRANSACTION_SPI_ERROR)
         {
             return TRANSACTION_SPI_ERROR;
         }
 
+        // Increment local command counter for all reached BMBs
         incCommandCounter(port);
         if(chainInfo.chainStatus == CHAIN_COMPLETE)
         {
             incCommandCounter(!port);
         }
 
+        // Read serial ID register to verify command counter incremented
         for(int32_t readAttempt = 0; readAttempt < 2; readAttempt++)
         {
             uint8_t rxBuff[REGISTER_SIZE_BYTES * numBmbs];
@@ -410,15 +415,7 @@ static TRANSACTION_STATUS_E sendAndVerifyCommand(uint16_t command, uint32_t numB
 
             if(readStatus == TRANSACTION_SUCCESS)
             {
-                if(readAttempt == 0)
-                {
-                    return TRANSACTION_SUCCESS;
-                }
-                break;
-            }
-            else if(readStatus == TRANSACTION_COMMAND_COUNTER_ERROR)
-            {
-                if(readAttempt == 0)
+                if(chainInfo.commandCounterError[port])
                 {
                     if(sendCommand(RESET_COMMAND_COUNTER_ADDRESS, numBmbs, port) == TRANSACTION_SPI_ERROR)
                     {
@@ -432,7 +429,10 @@ static TRANSACTION_STATUS_E sendAndVerifyCommand(uint16_t command, uint32_t numB
                 }
                 else
                 {
-                    return TRANSACTION_COMMAND_COUNTER_ERROR;
+                    if(readAttempt == 0)
+                    {
+                        return TRANSACTION_SUCCESS;
+                    }
                 }
             }
             else
@@ -448,17 +448,20 @@ static TRANSACTION_STATUS_E writeAndVerifyRegister(uint16_t command, uint32_t nu
 {
     for(int32_t writeAttempt = 0; writeAttempt < TRANSACTION_ATTEMPTS; writeAttempt++)
     {
+        // Send write packet
         if(writeRegister(command, numBmbs, txBuffer, port) == TRANSACTION_SPI_ERROR)
         {
             return TRANSACTION_SPI_ERROR;
         }
 
+        // Increment local command counter for all reached BMBs
         incCommandCounter(port);
         if(chainInfo.chainStatus == CHAIN_COMPLETE)
         {
             incCommandCounter(!port);
-        }
+        } 
 
+        // Read back written register to verify message receipt
         for(int32_t readAttempt = 0; readAttempt < 2; readAttempt++)
         {
             uint8_t rxBuff[REGISTER_SIZE_BYTES * numBmbs];
@@ -466,22 +469,7 @@ static TRANSACTION_STATUS_E writeAndVerifyRegister(uint16_t command, uint32_t nu
 
             if(readStatus == TRANSACTION_SUCCESS)
             {
-                if(readAttempt == 0)
-                {
-                    if(memcmp(rxBuff, txBuffer, REGISTER_SIZE_BYTES * numBmbs))
-                    {
-                        return TRANSACTION_SUCCESS;
-                    }
-                    else
-                    {
-                        return TRANSACTION_WRITE_REJECT;
-                    }  
-                }
-                break;
-            }
-            else if(readStatus == TRANSACTION_COMMAND_COUNTER_ERROR)
-            {
-                if(readAttempt == 0)
+                if(chainInfo.commandCounterError[port])
                 {
                     if(sendCommand(RESET_COMMAND_COUNTER_ADDRESS, numBmbs, port) == TRANSACTION_SPI_ERROR)
                     {
@@ -495,7 +483,17 @@ static TRANSACTION_STATUS_E writeAndVerifyRegister(uint16_t command, uint32_t nu
                 }
                 else
                 {
-                    return TRANSACTION_COMMAND_COUNTER_ERROR;
+                    if(readAttempt == 0)
+                    {
+                        if(memcmp(rxBuff, txBuffer, REGISTER_SIZE_BYTES * numBmbs))
+                        {
+                            return TRANSACTION_SUCCESS;
+                        }
+                        else
+                        {
+                            return TRANSACTION_WRITE_REJECT;
+                        } 
+                    }
                 }
             }
             else
@@ -661,16 +659,36 @@ void wakeChain(uint32_t numBmbs)
     }
 }
 
+/**
+ * @brief   Send a command to all BMBs in chain
+ * @param   command - The command code to send
+ * @param   numBmbs - The number of BMBs in the chain
+ * @return  Returns the status of the command transaction
+*/
 TRANSACTION_STATUS_E commandAll(uint16_t command, uint32_t numBmbs)
 {
     return sendMessageBmbChain(sendAndVerifyCommand, command, numBmbs, NULL);
 }
 
+/**
+ * @brief   Write data to a BMB register
+ * @param   command - The write command code
+ * @param   numBmbs - The number of BMBs in the chain
+ * @param   txData  - The register data to write to every BMB
+ * @return  Returns the status of the command transaction
+*/
 TRANSACTION_STATUS_E writeAll(uint16_t command, uint32_t numBmbs, uint8_t *txData)
 { 
     return sendMessageBmbChain(writeAndVerifyRegister, command, numBmbs, txData);
 }
 
+/**
+ * @brief   Read data from a BMB register
+ * @param   command - The read command code to send
+ * @param   numBmbs - The number of BMBs in the chain
+ * @param   rxData  - A reference to the data buffer to populate with BMB data 
+ * @return  Returns the status of the command transaction
+*/
 TRANSACTION_STATUS_E readAll(uint16_t command, uint32_t numBmbs, uint8_t *rxData)
 { 
     return sendMessageBmbChain(readRegister, command, numBmbs, rxData);
