@@ -38,9 +38,6 @@
 #define CELLS_PER_REG           3
 #define CELL_REG_SIZE           REGISTER_SIZE_BYTES / CELLS_PER_REG
 
-#define ADC_RESOLUTION_BITS     16
-#define MAX_ADC_READING         0xFFFF
-#define RAILED_MARGIN_BITS      2500
 #define ADC_RESOLUTION          0.00015f
 #define ADC_OFFSET_VOLT         1.5f
 
@@ -130,19 +127,19 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb);
         else if(error == TRANSACTION_COMMAND_COUNTER_ERROR) \
         { \
             Debug("Command Counter Error!\n"); \
+            return; \
         } \
         else if(error == TRANSACTION_WRITE_REJECT) \
         { \
             Debug("Write Rejected!\n"); \
+            return; \
         } \
         else \
         { \
             Debug("Unknown Transaction Error\n"); \
+            return; \
         } \
     }
-
-// Check if 16bit ADC is railed
-#define IS_ADC_RAILED(rawAdc) ((rawAdc < RAILED_MARGIN_BITS) || (rawAdc > (MAX_ADC_READING - RAILED_MARGIN_BITS)))
 
 // Convert 16bit ADC reading to voltage
 #define CONVERT_16_BIT_ADC(rawAdc) (((int16_t)(rawAdc) * ADC_RESOLUTION) + ADC_OFFSET_VOLT)
@@ -174,81 +171,83 @@ static bool initBmbs()
 
 static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb)
 {
+    // Hold current state of off-chip analog MUX 
     static MUX_STATE_E muxState = MUX_STATE_0;
 
-    TRANSACTION_STATUS_E msgStatus;
+
+    // Create a register buffer for read transactions
     uint8_t registerData[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
+    TRANSACTION_STATUS_E msgStatus;
 
     for(int32_t i = 0; i < NUM_AUX_REG-1; i++)
     {
+        // Clear register buffer
         memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+
+        // Read aux register from all BMBs
         msgStatus = readAll(readAuxReg[i], NUM_BMBS_IN_ACCUMULATOR, registerData);
-        if((msgStatus != TRANSACTION_SUCCESS) && (msgStatus != TRANSACTION_CRC_ERROR) && (msgStatus != TRANSACTION_COMMAND_COUNTER_ERROR))
+        if(msgStatus != TRANSACTION_SUCCESS)
         {
             return msgStatus;
         }
+
+        // Sort through aux registers and populate BMB struct cell temps
         for(int32_t j = 0; j < CELLS_PER_REG; j++)
         {
             for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
             {
+                // Extract 16bit ADC from register
                 uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
                 uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
                 uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-                // if(IS_ADC_RAILED(rawAdc))
-                // {
-                //     bmb[k].cellTempStatus[(muxState) + 2 * ((i * CELLS_PER_REG) + j)] = BAD;
-                // }
-                // else
-                // {
-                    bmb[k].cellTemp[(muxState) + 2 * ((i * CELLS_PER_REG) + j)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
-                    bmb[k].cellTempStatus[(muxState) + 2 * ((i * CELLS_PER_REG) + j)] = GOOD;
-                // }
+
+                // Convert ADC to temp and populate bmb struct 
+                bmb[k].cellTemp[(muxState) + 2 * ((i * CELLS_PER_REG) + j)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
+                bmb[k].cellTempStatus[(muxState) + 2 * ((i * CELLS_PER_REG) + j)] = GOOD;
             }
         }
     }
 
+    // Clear register buffer
     memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+
+    // Read aux register from all BMBs
     msgStatus = readAll(readAuxReg[2], NUM_BMBS_IN_ACCUMULATOR, registerData);
-    if((msgStatus != TRANSACTION_SUCCESS) && (msgStatus != TRANSACTION_CRC_ERROR) && (msgStatus != TRANSACTION_COMMAND_COUNTER_ERROR))
+    if(msgStatus != TRANSACTION_SUCCESS)
     {
         return msgStatus;
     }
+
+    // Sort through aux register and populate BMB struct cell temps
     for(int32_t j = 0; j < CELLS_PER_REG-1; j++)
     {
         for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
         {
+            // Extract 16bit ADC from register
             uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
             uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
             uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-            // if(IS_ADC_RAILED(rawAdc))
-            // {
-            //     bmb[k].cellTempStatus[(muxState) + 2 * ((2 * CELLS_PER_REG) + j)] = BAD;
-            // }
-            // else
-            // {
-                bmb[k].cellTemp[(muxState) + 2 * ((2 * CELLS_PER_REG) + j)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
-                bmb[k].cellTempStatus[(muxState) + 2 * ((2 * CELLS_PER_REG) + j)] = GOOD;
-            // }
+
+            // Convert ADC to temp and populate bmb struct 
+            bmb[k].cellTemp[(muxState) + 2 * ((2 * CELLS_PER_REG) + j)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
+            bmb[k].cellTempStatus[(muxState) + 2 * ((2 * CELLS_PER_REG) + j)] = GOOD;
         }
     }
 
+    // Extract final ADC value from register (board temp)
     for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
     {
+        // Extract 16bit ADC from register
         uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (2 * CELL_REG_SIZE)];
         uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (2 * CELL_REG_SIZE) + 1];
         uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-        // if(IS_ADC_RAILED(rawAdc))
-        // {
-        //     bmb[k].boardTempStatus = BAD;
-        // }
-        // else
-        // {
-            bmb[k].boardTemp = lookup(CONVERT_16_BIT_ADC(rawAdc), &boardTempTable);
-            bmb[k].boardTempStatus = GOOD;
-        // }
+
+        // Convert ADC to temp and populate bmb struct
+        bmb[k].boardTemp = lookup(CONVERT_16_BIT_ADC(rawAdc), &boardTempTable);
+        bmb[k].boardTempStatus = GOOD;
     }
 
-    
+    // Cycle mux state
     muxState++;
     muxState %= NUM_MUX_STATES;
 
@@ -260,12 +259,13 @@ static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb)
         return msgStatus;
     }
 
+    // Start Aux ADC conversion
     msgStatus = commandAll(CMD_START_AUX_ADC, NUM_BMBS_IN_ACCUMULATOR);
-    if((msgStatus != TRANSACTION_SUCCESS) && (msgStatus != TRANSACTION_CRC_ERROR))
+    if(msgStatus != TRANSACTION_SUCCESS)
     {
         return msgStatus;
     }
-    return msgStatus;
+    return TRANSACTION_SUCCESS;
 }
 
 static TRANSACTION_STATUS_E updateCellVoltages(Bmb_S* bmb)
@@ -277,7 +277,7 @@ static TRANSACTION_STATUS_E updateCellVoltages(Bmb_S* bmb)
     {
         memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
         msgStatus = readAll(readVoltReg[i], NUM_BMBS_IN_ACCUMULATOR, registerData);
-        if((msgStatus != TRANSACTION_SUCCESS) && (msgStatus != TRANSACTION_CRC_ERROR) && (msgStatus != TRANSACTION_COMMAND_COUNTER_ERROR))
+        if(msgStatus != TRANSACTION_SUCCESS)
         {
             return msgStatus;
         }
@@ -288,22 +288,15 @@ static TRANSACTION_STATUS_E updateCellVoltages(Bmb_S* bmb)
                 uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
                 uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
                 uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-                if(IS_ADC_RAILED(rawAdc))
-                {
-                    bmb[k].cellVoltageStatus[(i * CELLS_PER_REG) + j] = BAD;
-                }
-                else
-                {
-                    bmb[k].cellVoltage[(i * CELLS_PER_REG) + j] = CONVERT_16_BIT_ADC(rawAdc);
-                    bmb[k].cellVoltageStatus[(i * CELLS_PER_REG) + j] = GOOD;
-                }
+                bmb[k].cellVoltage[(i * CELLS_PER_REG) + j] = CONVERT_16_BIT_ADC(rawAdc);
+                bmb[k].cellVoltageStatus[(i * CELLS_PER_REG) + j] = GOOD;
             }
         }
     }
 
     memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
     msgStatus = readAll(readVoltReg[5], NUM_BMBS_IN_ACCUMULATOR, registerData);
-    if((msgStatus != TRANSACTION_SUCCESS) && (msgStatus != TRANSACTION_CRC_ERROR) && (msgStatus != TRANSACTION_COMMAND_COUNTER_ERROR))
+    if(msgStatus != TRANSACTION_SUCCESS)
     {
         return msgStatus;
     }
@@ -312,19 +305,12 @@ static TRANSACTION_STATUS_E updateCellVoltages(Bmb_S* bmb)
         uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES)];
         uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + 1];
         uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-        if(IS_ADC_RAILED(rawAdc))
-        {
-            bmb[k].cellVoltageStatus[(5 * CELLS_PER_REG)] = BAD;
-        }
-        else
-        {
-            bmb[k].cellVoltage[(5 * CELLS_PER_REG)] = CONVERT_16_BIT_ADC(rawAdc);
-            bmb[k].cellVoltageStatus[(5 * CELLS_PER_REG)] = GOOD;
-        }
+        bmb[k].cellVoltage[(5 * CELLS_PER_REG)] = CONVERT_16_BIT_ADC(rawAdc);
+        bmb[k].cellVoltageStatus[(5 * CELLS_PER_REG)] = GOOD;
     }
 
     msgStatus = commandAll(CMD_START_CADC, NUM_BMBS_IN_ACCUMULATOR);
-    if((msgStatus != TRANSACTION_SUCCESS) && (msgStatus != TRANSACTION_CRC_ERROR))
+    if(msgStatus != TRANSACTION_SUCCESS)
     {
         return msgStatus;
     }
@@ -378,9 +364,16 @@ void runBmbUpdateTask()
     taskEXIT_CRITICAL();
 
     wakeChain(NUM_BMBS_IN_ACCUMULATOR);
-    HANDLE_BMB_ERROR(updateCellVoltages(bmbTaskOutputDataLocal.bmb));
-    HANDLE_BMB_ERROR(updateCellTemps(bmbTaskOutputDataLocal.bmb));
-    HANDLE_BMB_ERROR(updateTestData(bmbTaskOutputDataLocal.bmb));
+    
+    TRANSACTION_STATUS_E status;
+    status = updateCellVoltages(bmbTaskOutputDataLocal.bmb);
+    HANDLE_BMB_ERROR(status);
+
+    status = updateCellTemps(bmbTaskOutputDataLocal.bmb);
+    HANDLE_BMB_ERROR(status);
+
+    status = updateTestData(bmbTaskOutputDataLocal.bmb);
+    HANDLE_BMB_ERROR(status);
 
     taskENTER_CRITICAL();
     bmbTaskOutputData = bmbTaskOutputDataLocal;

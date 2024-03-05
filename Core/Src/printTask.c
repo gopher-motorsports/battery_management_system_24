@@ -35,25 +35,25 @@ static void printCellVoltages(Bmb_S* bmb)
     printf("|   BMB   |");
     for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
     {
-        printf("    %02ld   |", i);
+        printf("    %02ld    |", i);
     }
     printf("\n");
     for(int32_t i = 0; i < NUM_CELLS_PER_BMB; i++)
     {
-        printf("|    %02ld   |", i);
+        printf("|     %02ld   |", i);
         for(int32_t j = 0; j < NUM_BMBS_IN_ACCUMULATOR; j++)
         {
             if(bmb[j].cellVoltageStatus[i] == GOOD)
             {
-                printf("  %5.3f  ", (double)bmb[j].cellVoltage[i]);
+                printf("   %5.3f  |", (double)bmb[j].cellVoltage[i]);
                 // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
             }
             else
             {
-                printf("NO SIGNAL");
+                printf(" NO SIGNAL |");
             }
-            printf("|\n");
         }
+        printf("\n");
     }
 	printf("\n");
 }
@@ -64,7 +64,7 @@ static void printCellTemps(Bmb_S* bmb)
     printf("|   BMB   |");
     for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
     {
-        printf("    %02ld   |", i);
+        printf("     %02ld    |", i);
     }
     printf("\n");
     for(int32_t i = 0; i < NUM_CELLS_PER_BMB; i++)
@@ -76,19 +76,19 @@ static void printCellTemps(Bmb_S* bmb)
             {
                 if((bmb[j].cellTemp[i] < 0.0f) || bmb[j].cellTemp[i] >= 100.0f)
                 {
-                    printf("  %3.1f  ", (double)bmb[j].cellTemp[i]);
+                    printf("   %3.1f   |", (double)bmb[j].cellTemp[i]);
                 }
                 else
                 {
-                    printf("   %3.1f  ", (double)bmb[j].cellTemp[i]);
+                    printf("    %3.1f   |", (double)bmb[j].cellTemp[i]);
                 }
             }
             else
             {
-                printf("NO SIGNAL");
+                printf(" NO SIGNAL |");
             }
-            printf("|\n");
         }
+        printf("\n");
     }
     printf("|  Board  |");
     for(int32_t j = 0; j < NUM_BMBS_IN_ACCUMULATOR; j++)
@@ -97,19 +97,18 @@ static void printCellTemps(Bmb_S* bmb)
         {
             if((bmb[j].boardTemp < 0.0f) || bmb[j].boardTemp >= 100.0f)
             {
-                printf("  %3.1f  ", (double)bmb[j].boardTemp);
+                printf("   %3.1f   |", (double)bmb[j].boardTemp);
             }
             else
             {
-                printf("   %3.1f  ", (double)bmb[j].boardTemp);
+                printf("    %3.1f   |", (double)bmb[j].boardTemp);
             }
             // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
         }
         else
         {
-            printf("NO SIGNAL");
+            printf(" NO SIGNAL |");
         }
-        printf("|\n");
     }
 	printf("\n");
 }

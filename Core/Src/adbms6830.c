@@ -381,7 +381,7 @@ static TRANSACTION_STATUS_E readRegister(uint16_t command, uint32_t numBmbs, uin
             }
             else if(port == PORTB)
             {
-                memcpy(rxBuff + ((numBmbs - j - 1) * REGISTER_SIZE_BYTES), registerData, REGISTER_SIZE_BYTES); 
+                memcpy(rxBuff + ((NUM_BMBS_IN_ACCUMULATOR - j - 1) * REGISTER_SIZE_BYTES), registerData, REGISTER_SIZE_BYTES); 
             }
         }
         return TRANSACTION_SUCCESS;
@@ -426,6 +426,7 @@ static TRANSACTION_STATUS_E sendAndVerifyCommand(uint16_t command, uint32_t numB
                     {
                         resetCommandCounter(!port);
                     }
+                    chainInfo.commandCounterError[port] = false;
                 }
                 else
                 {
@@ -480,6 +481,7 @@ static TRANSACTION_STATUS_E writeAndVerifyRegister(uint16_t command, uint32_t nu
                     {
                         resetCommandCounter(!port);
                     }
+                    chainInfo.commandCounterError[port] = false;
                 }
                 else
                 {
