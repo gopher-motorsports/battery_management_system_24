@@ -24,6 +24,7 @@ typedef struct
 static void printCellVoltages(Bmb_S* bmb);
 static void printCellTemps(Bmb_S* bmb);
 static void printTestData(Bmb_S* bmb);
+// static void printTempTest(Bmb_S* bmb);
 
 /* ==================================================================== */
 /* =================== LOCAL FUNCTION DEFINITIONS ===================== */
@@ -124,13 +125,37 @@ static void printTestData(Bmb_S* bmb)
     printf("\n");
 }
 
+// static void printTempTest(Bmb_S* bmb)
+// {
+//     printf("| %09lu |", HAL_GetTick());
+//     for(int32_t i = 0; i < NUM_CELLS_PER_BMB; i++)
+//     {
+//         if(bmb[0].cellTempStatus[i] == GOOD)
+//         {
+//             if((bmb[0].cellTemp[i] < 0.0f) || bmb[0].cellTemp[i] >= 100.0f)
+//             {
+//                 printf("  %3.1f  |", (double)bmb[0].cellTemp[i]);
+//             }
+//             else
+//             {
+//                 printf("   %3.1f  |", (double)bmb[0].cellTemp[i]);
+//             }
+//         }
+//         else
+//         {
+//             printf(" NO SIG  |");
+//         }
+//     }
+//     printf("\n");
+// }
+
 /* ==================================================================== */
 /* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
 /* ==================================================================== */
 
 void initPrintTask()
 {
-
+    
 }
 
 void runPrintTask()
