@@ -342,9 +342,9 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb)
 
 void initBmbUpdateTask()
 {
-    // TODO Remove for custom hardware where master pins tied high
-    HAL_GPIO_WritePin(MAS1_GPIO_Port, MAS1_Pin, SET);
-    HAL_GPIO_WritePin(MAS2_GPIO_Port, MAS2_Pin, SET);
+    // // TODO Remove for custom hardware where master pins tied high
+    // HAL_GPIO_WritePin(MAS1_GPIO_Port, MAS1_Pin, SET);
+    // HAL_GPIO_WritePin(MAS2_GPIO_Port, MAS2_Pin, SET);
 }
 
 void runBmbUpdateTask()
