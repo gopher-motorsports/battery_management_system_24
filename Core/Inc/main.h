@@ -32,6 +32,7 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "bmbUpdateTask.h"
+#include "lowPriTask.h"
 
 /* USER CODE END Includes */
 
@@ -72,6 +73,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 
 extern BmbTaskOutputData_S bmbTaskOutputData;
+extern LowPriTaskOutputData_S lowPriTaskOutputData;
 
 /* USER CODE END Private defines */
 

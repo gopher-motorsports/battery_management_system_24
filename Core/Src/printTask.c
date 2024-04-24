@@ -2,11 +2,15 @@
 /* ============================= INCLUDES ============================= */
 /* ==================================================================== */
 #include <stdio.h>
+#include <string.h>
 
 #include "printTask.h"
 #include "main.h"
 #include "bmbUpdateTask.h"
+#include "lowPriTask.h"
 #include "cmsis_os.h"
+
+#include "imd.h"
 
 /* ==================================================================== */
 /* ============================== STRUCTS ============================= */
@@ -15,6 +19,7 @@
 typedef struct
 {
     BmbTaskOutputData_S bmbTaskData;
+    IMD_State_E imdState;
 } PrintTaskInputData_S;
 
 /* ==================================================================== */
@@ -149,6 +154,35 @@ static void printTestData(Bmb_S* bmb)
 //     printf("\n");
 // }
 
+const char* IMD_State_To_String(IMD_State_E state) 
+{
+	switch(state) {
+        case IMD_NO_SIGNAL:
+            return "IMD_NO_SIGNAL";
+        case IMD_NORMAL:
+            return "IMD_NORMAL";
+        case IMD_UNDER_VOLT:
+            return "IMD_UNDER_VOLT";
+        case IMD_SPEED_START_MEASUREMENT_GOOD:
+            return "IMD_SPEED_START_MEASUREMENT_GOOD";
+        case IMD_SPEED_START_MEASUREMENT_BAD:
+            return "IMD_SPEED_START_MEASUREMENT_BAD";
+        case IMD_DEVICE_ERROR:
+            return "IMD_DEVICE_ERROR";
+        case IMD_EARTH_FAULT:
+            return "IMD_EARTH_FAULT";
+        default:
+            return "UNKNOWN_STATE";
+    }
+}
+
+static void printImdStatus(IMD_State_E state)
+{
+    const char* stateStr = IMD_State_To_String(state);
+	printf("IMD State: %s\n", stateStr);
+	printf("\n");
+}
+
 /* ==================================================================== */
 /* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
 /* ==================================================================== */
@@ -163,10 +197,12 @@ void runPrintTask()
     PrintTaskInputData_S printTaskInputData;
     taskENTER_CRITICAL();
     printTaskInputData.bmbTaskData = bmbTaskOutputData;
+    printTaskInputData.imdState = lowPriTaskOutputData.imdState;
     taskEXIT_CRITICAL();
 
     printf("\e[1;1H\e[2J");
     printCellVoltages(printTaskInputData.bmbTaskData.bmb);
     printCellTemps(printTaskInputData.bmbTaskData.bmb);
     printTestData(printTaskInputData.bmbTaskData.bmb);
+    printImdStatus(printTaskInputData.imdState);
 }
