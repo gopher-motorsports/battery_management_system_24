@@ -24,9 +24,9 @@ extern volatile uint32_t imdLastUpdate;
 */
 IMD_State_E getImdStatus()
 {
-    printf("IMD FREQ: %lu\n", imdFrequency);
-    printf("IMD DUTY: %lu\n", imdDutyCycle);
-    printf("IMD LAST: %lu\n", imdLastUpdate);
+    DebugIMD("IMD FREQ: %lu\n", imdFrequency);
+    DebugIMD("IMD DUTY: %lu\n", imdDutyCycle);
+    DebugIMD("IMD LAST: %lu\n", imdLastUpdate);
 
 	if (imdFrequency > 45)
 	{
