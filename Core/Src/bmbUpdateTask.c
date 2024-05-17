@@ -104,6 +104,7 @@ static bool initBmbs();
 static TRANSACTION_STATUS_E updateCellVoltages(Bmb_S* bmb);
 static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb);
 static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb);
+static TRANSACTION_STATUS_E balanceAll(Bmb_S* bmb);
 
 /* ==================================================================== */
 /* ============================== MACROS ============================== */
@@ -347,10 +348,19 @@ static TRANSACTION_STATUS_E balanceAll(Bmb_S* bmb)
     TRANSACTION_STATUS_E msgStatus;
     for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
     {
-        writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
-        writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerData);
+        msgStatus = writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
+        if(msgStatus != TRANSACTION_SUCCESS)
+        {
+            return msgStatus;
+        }
+
+        msgStatus = writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerData);
+        if(msgStatus != TRANSACTION_SUCCESS)
+        {
+            return msgStatus;
+        }
     }
-    
+    return TRANSACTION_SUCCESS;
 }
 
 /* ==================================================================== */
@@ -391,6 +401,9 @@ void runBmbUpdateTask()
 
     status = updateTestData(bmbTaskOutputDataLocal.bmb);
     HANDLE_BMB_ERROR(status);
+
+    // status = balanceAll(bmbTaskOutputDataLocal.bmb);
+    // HANDLE_BMB_ERROR(status);
 
     taskENTER_CRITICAL();
     bmbTaskOutputData = bmbTaskOutputDataLocal;
