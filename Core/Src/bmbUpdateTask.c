@@ -345,20 +345,10 @@ static TRANSACTION_STATUS_E balanceAll(Bmb_S* bmb)
     uint8_t registerData[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
     memset(registerData, 0xFF, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
 
-    TRANSACTION_STATUS_E msgStatus;
     for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
     {
-        msgStatus = writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
-        if(msgStatus != TRANSACTION_SUCCESS)
-        {
-            return msgStatus;
-        }
-
-        msgStatus = writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerData);
-        if(msgStatus != TRANSACTION_SUCCESS)
-        {
-            return msgStatus;
-        }
+        writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
+        writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerData);
     }
     return TRANSACTION_SUCCESS;
 }
@@ -402,8 +392,8 @@ void runBmbUpdateTask()
     status = updateTestData(bmbTaskOutputDataLocal.bmb);
     HANDLE_BMB_ERROR(status);
 
-    // status = balanceAll(bmbTaskOutputDataLocal.bmb);
-    // HANDLE_BMB_ERROR(status);
+    status = balanceAll(bmbTaskOutputDataLocal.bmb);
+    HANDLE_BMB_ERROR(status);
 
     taskENTER_CRITICAL();
     bmbTaskOutputData = bmbTaskOutputDataLocal;
