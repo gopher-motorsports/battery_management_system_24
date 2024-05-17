@@ -34,6 +34,9 @@
 #define READ_AUX_REG_C          0x001B
 #define NUM_AUX_REG             3
 
+#define WR_PWM_A                0x0020
+#define WR_PWM_B                0x0022
+
 #define TEMPS_PER_MUX           8
 #define CELLS_PER_REG           3
 #define CELL_REG_SIZE           REGISTER_SIZE_BYTES / CELLS_PER_REG
@@ -334,6 +337,20 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb)
         bmb[0].testData[i] = registerData[i];
     }
     return TRANSACTION_SUCCESS;
+}
+
+static TRANSACTION_STATUS_E balanceAll(Bmb_S* bmb)
+{
+    uint8_t registerData[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
+    memset(registerData, 0xFF, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+
+    TRANSACTION_STATUS_E msgStatus;
+    for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+    {
+        writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
+        writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerData);
+    }
+    
 }
 
 /* ==================================================================== */
