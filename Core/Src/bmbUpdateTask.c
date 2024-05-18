@@ -256,7 +256,7 @@ static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb)
     muxState %= NUM_MUX_STATES;
 
     uint8_t data[6] = {0x01, 0x00, 0x00, 0xFF, 0x00, 0x00};
-    data[4] = (uint8_t)muxState;
+    data[4] = ((uint8_t)muxState << 1) | (0x01);
     msgStatus = writeAll(WR_CFG_REG_A, NUM_BMBS_IN_ACCUMULATOR, data);
     if((msgStatus != TRANSACTION_SUCCESS) && (msgStatus != TRANSACTION_CRC_ERROR) && (msgStatus != TRANSACTION_WRITE_REJECT) && (msgStatus != TRANSACTION_COMMAND_COUNTER_ERROR))
     {
