@@ -16,7 +16,7 @@
 /* ============================= DEFINES ============================== */
 /* ==================================================================== */
 
-#define CMD_START_CADC          0x0360
+#define CMD_START_CADC          0x0370
 #define CMD_START_AUX_ADC       0x0410  
 
 #define WR_CFG_REG_A            0x0001
@@ -35,7 +35,7 @@
 #define NUM_AUX_REG             3
 
 #define WR_PWM_A                0x0020
-#define WR_PWM_B                0x0022
+#define WR_PWM_B                0x0021
 
 #define TEMPS_PER_MUX           8
 #define CELLS_PER_REG           3
@@ -331,7 +331,7 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb)
     // data[3] = ioSet;
 
     // writeAll(0x0001, NUM_BMBS_IN_ACCUMULATOR, data);
-    bmb[0].status = readAll(0x0002, NUM_BMBS_IN_ACCUMULATOR, registerData);
+    bmb[0].status = readAll(0x0022, NUM_BMBS_IN_ACCUMULATOR, registerData);
     
     for(int32_t i = 0; i < REGISTER_SIZE_BYTES; i++)
     {
@@ -343,12 +343,16 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb)
 static TRANSACTION_STATUS_E balanceAll(Bmb_S* bmb)
 {
     uint8_t registerData[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
-    memset(registerData, 0xFF, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+    memset(registerData, 0x00, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+    registerData[4] = 0xFF;
+    registerData[5] = 0xFF;
 
     for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
     {
-        writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
-        writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerData);
+        // writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
+        // writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerData);
+        writeAll(0x0024, NUM_BMBS_IN_ACCUMULATOR, registerData);
+
     }
     return TRANSACTION_SUCCESS;
 }

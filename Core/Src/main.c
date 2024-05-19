@@ -36,7 +36,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define BMB_UPDATE_TASK_PERIOD_MS   500
+#define BMB_UPDATE_TASK_PERIOD_MS   50
 #define PRINT_TASK_PERIOD_MS        1000
 /* USER CODE END PD */
 
