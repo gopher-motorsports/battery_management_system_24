@@ -32,7 +32,7 @@ static void printTestData(Bmb_S* bmb);
 
 static void printCellVoltages(Bmb_S* bmb)
 {
-    printf("Cell Voltage:\n");
+    printf("Switch Voltage:\n");
     printf("|   BMB   |");
     for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
     {

@@ -17,7 +17,8 @@
 /* ==================================================================== */
 
 #define CMD_START_CADC          0x0370
-#define CMD_START_AUX_ADC       0x0410  
+#define CMD_START_SADC          0x0178 // 0x0178 (No OW), 0x0179 (ODD OW), 0x017A (EVEN OW), 0x0179 (BOTH OW)
+#define CMD_START_AUX_ADC       0x0410
 
 #define WR_CFG_REG_A            0x0001
 
@@ -27,6 +28,14 @@
 #define READ_VOLT_REG_D         0x004A
 #define READ_VOLT_REG_E         0x0049
 #define READ_VOLT_REG_F         0x004B
+
+#define READ_SW_VOLT_REG_A      0x0003
+#define READ_SW_VOLT_REG_B      0x0005
+#define READ_SW_VOLT_REG_C      0x0007
+#define READ_SW_VOLT_REG_D      0x000D
+#define READ_SW_VOLT_REG_E      0x000E
+#define READ_SW_VOLT_REG_F      0x000F
+
 #define NUM_VOLT_REG            6
 
 #define READ_AUX_REG_A          0x0019
@@ -69,9 +78,9 @@ typedef enum
 
 uint16_t readVoltReg[NUM_VOLT_REG] =
 {
-    READ_VOLT_REG_A, READ_VOLT_REG_B,
-    READ_VOLT_REG_C, READ_VOLT_REG_D,
-    READ_VOLT_REG_E, READ_VOLT_REG_F,
+    READ_SW_VOLT_REG_A, READ_SW_VOLT_REG_B,
+    READ_SW_VOLT_REG_C, READ_SW_VOLT_REG_D,
+    READ_SW_VOLT_REG_E, READ_SW_VOLT_REG_F,
 };
 
 uint16_t readAuxReg[NUM_AUX_REG] =
@@ -161,7 +170,7 @@ static bool initBmbs()
 
     // uint8_t data[6] = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
     // initSuccess |= (writeAll(WR_CFG_REG_A, NUM_BMBS_IN_ACCUMULATOR, data) != TRANSACTION_SUCCESS);
-    initSuccess |= (commandAll(CMD_START_CADC, NUM_BMBS_IN_ACCUMULATOR) != TRANSACTION_SUCCESS);
+    initSuccess |= (commandAll(CMD_START_SADC, NUM_BMBS_IN_ACCUMULATOR) != TRANSACTION_SUCCESS);
     initSuccess |= (commandAll(CMD_START_AUX_ADC, NUM_BMBS_IN_ACCUMULATOR) != TRANSACTION_SUCCESS);
 
     if(!initSuccess)
@@ -313,7 +322,7 @@ static TRANSACTION_STATUS_E updateCellVoltages(Bmb_S* bmb)
         bmb[k].cellVoltageStatus[(5 * CELLS_PER_REG)] = GOOD;
     }
 
-    msgStatus = commandAll(CMD_START_CADC, NUM_BMBS_IN_ACCUMULATOR);
+    msgStatus = commandAll(CMD_START_SADC, NUM_BMBS_IN_ACCUMULATOR);
     if(msgStatus != TRANSACTION_SUCCESS)
     {
         return msgStatus;
@@ -346,6 +355,21 @@ static TRANSACTION_STATUS_E balanceAll(Bmb_S* bmb)
     memset(registerData, 0x00, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
     registerData[4] = 0xFF;
     registerData[5] = 0xFF;
+
+    for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+    {
+        // writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
+        // writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerData);
+        writeAll(0x0024, NUM_BMBS_IN_ACCUMULATOR, registerData);
+
+    }
+    return TRANSACTION_SUCCESS;
+}
+
+static TRANSACTION_STATUS_E stopBalancingAll(Bmb_S* bmb)
+{
+    uint8_t registerData[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
+    memset(registerData, 0x00, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
 
     for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
     {
@@ -396,8 +420,8 @@ void runBmbUpdateTask()
     status = updateTestData(bmbTaskOutputDataLocal.bmb);
     HANDLE_BMB_ERROR(status);
 
-    status = balanceAll(bmbTaskOutputDataLocal.bmb);
-    HANDLE_BMB_ERROR(status);
+    // status = balanceAll(bmbTaskOutputDataLocal.bmb);
+    // HANDLE_BMB_ERROR(status);
 
     taskENTER_CRITICAL();
     bmbTaskOutputData = bmbTaskOutputDataLocal;
