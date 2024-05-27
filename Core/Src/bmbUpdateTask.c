@@ -493,7 +493,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
                     }
                     else if((sadcDiagnosticState == SADC_OW_EVEN) && (bool)(cellIndex % 2))
                     {
-                        if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.5f)
+                        if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.1f)
                         {
                             openWireMask |= ((uint16_t)1<<cellIndex);
                         }
@@ -504,7 +504,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
                     }
                     else if((sadcDiagnosticState == SADC_OW_ODD) && !(bool)(cellIndex % 2))
                     {
-                        if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.5f)
+                        if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.1f)
                         {
                             openWireMask |= ((uint16_t)1<<cellIndex);
                         }
@@ -545,7 +545,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
             }
             else if((sadcDiagnosticState == SADC_OW_EVEN) && (bool)(cellIndex % 2))
             {
-                if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.5f)
+                if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.1f)
                 {
                     openWireMask |= ((uint16_t)1<<cellIndex);
                 }
@@ -556,7 +556,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
             }
             else if((sadcDiagnosticState == SADC_OW_ODD) && !(bool)(cellIndex % 2))
             {
-                if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.5f)
+                if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.1f)
                 {
                     openWireMask |= ((uint16_t)1<<cellIndex);
                 }
