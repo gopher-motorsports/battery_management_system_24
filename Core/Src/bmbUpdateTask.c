@@ -491,7 +491,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
                             bmbData->bmb[k].adcMismatch[cellIndex] = false;
                         }
                     }
-                    else if((sadcDiagnosticState == SADC_OW_EVEN) && (cellIndex % 2))
+                    else if((sadcDiagnosticState == SADC_OW_EVEN) && (bool)(cellIndex % 2))
                     {
                         if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.5f)
                         {
@@ -502,7 +502,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
                             openWireMask &= ~((uint16_t)1<<cellIndex);
                         }
                     }
-                    else if((sadcDiagnosticState == SADC_OW_ODD) && !(cellIndex % 2))
+                    else if((sadcDiagnosticState == SADC_OW_ODD) && !(bool)(cellIndex % 2))
                     {
                         if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.5f)
                         {
@@ -543,7 +543,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
                     bmbData->bmb[k].adcMismatch[cellIndex] = false;
                 }
             }
-            else if((sadcDiagnosticState == SADC_OW_EVEN) && (cellIndex % 2))
+            else if((sadcDiagnosticState == SADC_OW_EVEN) && (bool)(cellIndex % 2))
             {
                 if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.5f)
                 {
@@ -554,7 +554,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
                     openWireMask &= ~((uint16_t)1<<cellIndex);
                 }
             }
-            else if((sadcDiagnosticState == SADC_OW_ODD) && !(cellIndex % 2))
+            else if((sadcDiagnosticState == SADC_OW_ODD) && !(bool)(cellIndex % 2))
             {
                 if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.5f)
                 {
@@ -596,7 +596,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
     }
     else if(sadcDiagnosticState == SADC_OW_EVEN)
     {
-        msgStatus = commandAll(CMD_START_SADC | ADC_OW_EVEN, NUM_BMBS_IN_ACCUMULATOR);
+        msgStatus = commandAll(CMD_START_SADC | ADC_CONT | ADC_OW_EVEN, NUM_BMBS_IN_ACCUMULATOR);
         if(msgStatus != TRANSACTION_SUCCESS)
         {
             return msgStatus;
@@ -604,7 +604,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
     }
     else if(sadcDiagnosticState == SADC_OW_ODD)
     {
-        msgStatus = commandAll(CMD_START_SADC | ADC_OW_ODD, NUM_BMBS_IN_ACCUMULATOR);
+        msgStatus = commandAll(CMD_START_SADC | ADC_CONT | ADC_OW_ODD, NUM_BMBS_IN_ACCUMULATOR);
         if(msgStatus != TRANSACTION_SUCCESS)
         {
             return msgStatus;
