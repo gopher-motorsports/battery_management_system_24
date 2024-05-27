@@ -499,7 +499,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
                         }
                         else
                         {
-                            openWireMask &= ~((uint16_t)1<<cellIndex);
+                            // openWireMask &= ~((uint16_t)1<<cellIndex);
                         }
                     }
                 }
@@ -540,7 +540,7 @@ static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
                 }
                 else
                 {
-                    openWireMask &= ~((uint16_t)1<<cellIndex);
+                    // openWireMask &= ~((uint16_t)1<<cellIndex);
                 }
             }
         }
