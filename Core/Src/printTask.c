@@ -7,6 +7,7 @@
 #include "main.h"
 #include "bmbUpdateTask.h"
 #include "cmsis_os.h"
+#include "alerts.h"
 
 /* ==================================================================== */
 /* ============================== STRUCTS ============================= */
@@ -24,39 +25,108 @@ typedef struct
 static void printCellVoltages(Bmb_S* bmb);
 static void printCellTemps(Bmb_S* bmb);
 static void printTestData(Bmb_S* bmb);
+static void printActiveAlerts();
 // static void printTempTest(Bmb_S* bmb);
 
 /* ==================================================================== */
 /* =================== LOCAL FUNCTION DEFINITIONS ===================== */
 /* ==================================================================== */
 
+// static void printCellVoltages(Bmb_S* bmb)
+// {
+//     printf("Cell Voltage:\n");
+//     printf("|   BMB   |");
+//     for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+//     {
+//         printf("    %02ld    |", i);
+//     }
+//     printf("\n");
+//     for(int32_t i = 0; i < NUM_CELLS_PER_BMB; i++)
+//     {
+//         printf("|     %02ld   |", i);
+//         for(int32_t j = 0; j < NUM_BMBS_IN_ACCUMULATOR; j++)
+//         {
+//             if(bmb[j].cellVoltageStatus[i] == GOOD)
+//             {
+//                 printf("   %5.3f  |", (double)bmb[j].cellVoltage[i]);
+//                 // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
+//             }
+//             else
+//             {
+//                 printf(" NO SIGNAL |");
+//             }
+//         }
+//         printf("\n");
+//     }
+// 	printf("\n");
+// }
+
 static void printCellVoltages(Bmb_S* bmb)
 {
     printf("Cell Voltage:\n");
-    printf("|   BMB   |");
-    for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
-    {
-        printf("    %02ld    |", i);
-    }
+    printf("|   CELL  |");
+    printf("    RAW    |    AVG    |    FIL    |    SADC   |    TAB    |");
     printf("\n");
     for(int32_t i = 0; i < NUM_CELLS_PER_BMB; i++)
     {
-        printf("|     %02ld   |", i);
-        for(int32_t j = 0; j < NUM_BMBS_IN_ACCUMULATOR; j++)
+        printf("|    %02ld   |", i);
+        if(bmb[0].cellVoltageStatus[i] == GOOD)
         {
-            if(bmb[j].cellVoltageStatus[i] == GOOD)
-            {
-                printf("   %5.3f  |", (double)bmb[j].cellVoltage[i]);
-                // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
-            }
-            else
-            {
-                printf(" NO SIGNAL |");
-            }
+            printf("   %5.3f  |", (double)bmb[0].cellVoltage[i]);
+            // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
+        }
+        else
+        {
+            printf(" NO SIGNAL |");
+        }
+        if(bmb[0].cellVoltageAvgStatus[i] == GOOD)
+        {
+            printf("   %5.3f  |", (double)bmb[0].cellVoltageAvg[i]);
+            // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
+        }
+        else
+        {
+            printf(" NO SIGNAL |");
+        }
+        if(bmb[0].cellVoltageFilteredStatus[i] == GOOD)
+        {
+            printf("   %5.3f  |", (double)bmb[0].cellVoltageFiltered[i]);
+            // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
+        }
+        else
+        {
+            printf(" NO SIGNAL |");
+        }
+        if(bmb[0].cellVoltageRedundantStatus[i] == GOOD)
+        {
+            printf("   %5.3f  |", (double)bmb[0].cellVoltageRedundant[i]);
+            // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
+        }
+        else
+        {
+            printf(" NO SIGNAL |");
+        }
+        if(bmb[0].openWire[i])
+        {
+            printf(" OPEN WIRE |");
+        }
+        else
+        {
+            printf("           |");
         }
         printf("\n");
     }
+    printf("|    16   |    ----   |    ----   |    ----   |    ----   |");
+    if(bmb[0].openWire[NUM_CELLS_PER_BMB])
+    {
+        printf(" OPEN WIRE |");
+    }
+    else
+    {
+        printf("           |");
+    }
 	printf("\n");
+    printf("\n");
 }
 
 static void printCellTemps(Bmb_S* bmb)
@@ -149,6 +219,26 @@ static void printTestData(Bmb_S* bmb)
 //     printf("\n");
 // }
 
+static void printActiveAlerts()
+{
+	printf("Alerts Active:\n");
+	uint32_t numActiveAlerts = 0;
+	for (uint32_t i = 0; i < NUM_ALERTS; i++)
+	{
+		Alert_S* alert = alerts[i];
+		if (getAlertStatus(alert) == ALERT_SET)
+		{
+			printf("%s - ACTIVE!\n", alert->alertName);
+			numActiveAlerts++;
+		}
+	}
+	if (numActiveAlerts == 0)
+	{
+		printf("None\n");
+	}
+	printf("\n");
+}
+
 /* ==================================================================== */
 /* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
 /* ==================================================================== */
@@ -168,5 +258,6 @@ void runPrintTask()
     printf("\e[1;1H\e[2J");
     printCellVoltages(printTaskInputData.bmbTaskData.bmb);
     printCellTemps(printTaskInputData.bmbTaskData.bmb);
-    printTestData(printTaskInputData.bmbTaskData.bmb);
+    // printTestData(printTaskInputData.bmbTaskData.bmb);
+    // printActiveAlerts();
 }
