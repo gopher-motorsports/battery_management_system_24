@@ -72,7 +72,7 @@ static void printCellVoltages(Bmb_S* bmb)
         printf("|    %02ld   |", i);
         if(bmb[0].cellVoltageStatus[i] == GOOD)
         {
-            printf("   %5.3f  |", (double)bmb[0].cellVoltage[i]);
+            printf("   %5.3f   |", (double)bmb[0].cellVoltage[i]);
             // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
         }
         else
@@ -81,7 +81,7 @@ static void printCellVoltages(Bmb_S* bmb)
         }
         if(bmb[0].cellVoltageAvgStatus[i] == GOOD)
         {
-            printf("   %5.3f  |", (double)bmb[0].cellVoltageAvg[i]);
+            printf("   %5.3f   |", (double)bmb[0].cellVoltageAvg[i]);
             // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
         }
         else
@@ -90,7 +90,7 @@ static void printCellVoltages(Bmb_S* bmb)
         }
         if(bmb[0].cellVoltageFilteredStatus[i] == GOOD)
         {
-            printf("   %5.3f  |", (double)bmb[0].cellVoltageFiltered[i]);
+            printf("   %5.3f   |", (double)bmb[0].cellVoltageFiltered[i]);
             // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
         }
         else
@@ -99,7 +99,7 @@ static void printCellVoltages(Bmb_S* bmb)
         }
         if(bmb[0].cellVoltageRedundantStatus[i] == GOOD)
         {
-            printf("   %5.3f  |", (double)bmb[0].cellVoltageRedundant[i]);
+            printf("   %5.3f   |", (double)bmb[0].cellVoltageRedundant[i]);
             // printf("  %04X", gBms.bmb[j].cellVoltage[i]);
         }
         else
