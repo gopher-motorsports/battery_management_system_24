@@ -80,6 +80,9 @@ includeDirectories:
   - Core/Lib/**
   - Drivers/STM32F4xx_HAL_Driver/Inc
   - Drivers/STM32F4xx_HAL_Driver/Inc/Legacy
+  - ../gophercan-lib/**
+  - ../Gopher_Sense/lib/**
+  - ../Gopher_Sense/Build/**
 
 
 # Files that should be included in the compilation.
@@ -93,6 +96,13 @@ sourceFiles:
   - Core/Lib/**
   - Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c
   - Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.c
+  - ../gophercan-lib/GopherCAN.c
+  - ../gophercan-lib/GopherCAN_buffers.c
+  - ../gophercan-lib/GopherCAN_network.c
+  - ../Gopher_Sense/lib/adc_lib.c
+  - ../Gopher_Sense/lib/gopher_sense.c
+  - ../Gopher_Sense/Build/module_hw_config.c
+  - ../Gopher_Sense/Build/sensors.c
 
 
 # When no makefile is present it will show a warning pop-up.

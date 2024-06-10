@@ -270,16 +270,16 @@ static void printCellTemps(Bmb_S* bmb)
 	printf("\n");
 }
 
-static void printTestData(Bmb_S* bmb)
-{
-    printf("Test Read Result: \n");
-    for(int32_t i = 0; i < REGISTER_SIZE_BYTES; i++)
-    {
-        printf("%X\n", bmb[0].testData[i]);
-    }
-    printf("STATUS: %lu\n", (uint32_t)bmb[0].status);
-    printf("\n");
-}
+// static void printTestData(Bmb_S* bmb)
+// {
+//     printf("Test Read Result: \n");
+//     for(int32_t i = 0; i < REGISTER_SIZE_BYTES; i++)
+//     {
+//         printf("%X\n", bmb[0].testData[i]);
+//     }
+//     printf("STATUS: %lu\n", (uint32_t)bmb[0].status);
+//     printf("\n");
+// }
 
 // static void printTempTest(Bmb_S* bmb)
 // {
@@ -309,9 +309,9 @@ static void printActiveAlerts()
 {
 	printf("Alerts Active:\n");
 	uint32_t numActiveAlerts = 0;
-	for (uint32_t i = 0; i < NUM_ALERTS; i++)
+	for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
 	{
-		Alert_S* alert = alerts[i];
+		Alert_S* alert = bmbAlerts[i];
 		if (getAlertStatus(alert) == ALERT_SET)
 		{
 			printf("%s - ACTIVE!\n", alert->alertName);
@@ -347,5 +347,5 @@ void runPrintTask()
 
     printf("Min Cell V: %f\n", printTaskInputData.bmbTaskData.minCellVoltage);
     // printTestData(printTaskInputData.bmbTaskData.bmb);
-    // printActiveAlerts();
+    printActiveAlerts();
 }

@@ -31,6 +31,7 @@
 #define CMD_START_AUX_ADC       0x0410  
 
 #define WR_CFG_REG_A            0x0001
+#define WR_CFG_REG_B            0x0024
 
 #define READ_VOLT_REG_A         0x0004
 #define READ_VOLT_REG_B         0x0006
@@ -131,6 +132,8 @@ typedef enum
 /* ========================= LOCAL VARIABLES ========================== */
 /* ==================================================================== */
 
+extern volatile bool chargerConnected;
+
 uint16_t readVoltReg[NUM_VOLT_REG] =
 {
     READ_VOLT_REG_A, READ_VOLT_REG_B,
@@ -196,6 +199,8 @@ static void checkOpenWire(BmbTaskOutputData_S* bmbData);
 static TRANSACTION_STATUS_E updateBalanceSwitches(BmbTaskOutputData_S* bmbData);
 static TRANSACTION_STATUS_E runSwitchPinStateMachine(BmbTaskOutputData_S* bmbData, bool balancingEnabled);
 
+static void runBmbAlertMonitor(BmbTaskOutputData_S* bmbData);
+
 /* ==================================================================== */
 /* ============================== MACROS ============================== */
 /* ==================================================================== */
@@ -251,7 +256,7 @@ static bool initBmbs()
 
     // uint8_t data[6] = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
     // initSuccess |= (writeAll(WR_CFG_REG_A, NUM_BMBS_IN_ACCUMULATOR, data) != TRANSACTION_SUCCESS);
-    initSuccess &= (commandAll((CMD_START_CADC | ADC_RD | ADC_CONT), NUM_BMBS_IN_ACCUMULATOR) == TRANSACTION_SUCCESS);
+    initSuccess &= (commandAll((CMD_START_CADC | ADC_CONT), NUM_BMBS_IN_ACCUMULATOR) == TRANSACTION_SUCCESS);
     initSuccess &= (commandAll(CMD_START_AUX_ADC, NUM_BMBS_IN_ACCUMULATOR) == TRANSACTION_SUCCESS);
 
     if(!initSuccess)
@@ -294,9 +299,18 @@ static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb)
             uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
             uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
 
-            // Convert ADC to temp and populate bmb struct 
-            bmb[k].cellTemp[((j * 2) + 3)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
-            bmb[k].cellTempStatus[((j * 2) + 3)] = GOOD;
+            // Convert ADC to temp and populate bmb struct
+            float cellTemp = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
+            bmb[k].cellTemp[((j * 2) + 3)] = cellTemp;
+
+            if(cellTemp > 115.0f || cellTemp < -35.0f)
+            {
+                bmb[k].cellTempStatus[((j * 2) + 3)] = BAD;
+            }
+            else
+            {
+                bmb[k].cellTempStatus[((j * 2) + 3)] = GOOD;
+            }
         }
     }
 
@@ -321,9 +335,17 @@ static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb)
             uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
             uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
 
-            // Convert ADC to temp and populate bmb struct 
-            bmb[k].cellTemp[((j * 2) + 7)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
-            bmb[k].cellTempStatus[((j * 2) + 7)] = GOOD;
+            float cellTemp = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
+            bmb[k].cellTemp[((j * 2) + 7)] = cellTemp;
+
+            if(cellTemp > 115.0f || cellTemp < -35.0f)
+            {
+                bmb[k].cellTempStatus[((j * 2) + 7)] = BAD;
+            }
+            else
+            {
+                bmb[k].cellTempStatus[((j * 2) + 7)] = GOOD;
+            }
         }
     }
 
@@ -349,8 +371,17 @@ static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb)
             uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
 
             // Convert ADC to temp and populate bmb struct 
-            bmb[k].cellTemp[((j * 2) + 13)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
-            bmb[k].cellTempStatus[((j * 2) + 13)] = GOOD;
+            float cellTemp = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
+            bmb[k].cellTemp[((j * 2) + 13)] = cellTemp;
+
+            if(cellTemp > 115.0f || cellTemp < -35.0f)
+            {
+                bmb[k].cellTempStatus[((j * 2) + 13)] = BAD;
+            }
+            else
+            {
+                bmb[k].cellTempStatus[((j * 2) + 13)] = GOOD;
+            }
         }
     }
 
@@ -363,8 +394,17 @@ static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb)
         uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
 
         // Convert ADC to temp and populate bmb struct
-        bmb[k].boardTemp = lookup(CONVERT_16_BIT_ADC(rawAdc), &boardTempTable);
-        bmb[k].boardTempStatus = GOOD;
+        float boardTemp = lookup(CONVERT_16_BIT_ADC(rawAdc), &boardTempTable);
+        bmb[k].boardTemp = boardTemp;
+
+        if(boardTemp > 115.0f || boardTemp < -35.0f)
+        {
+            bmb[k].boardTempStatus = BAD;
+        }
+        else
+        {
+            bmb[k].boardTempStatus = GOOD;
+        }
     }
 
     // Read Stat A
@@ -494,6 +534,8 @@ static TRANSACTION_STATUS_E updateCellVoltages(BmbTaskOutputData_S* bmbData)
             return msgStatus;
         }
 
+        vTaskDelay(2);
+
         // Update cell voltages from raw CADC registers
         for(int32_t i = 0; i < NUM_VOLT_REG-1; i++)
         {
@@ -605,11 +647,11 @@ static TRANSACTION_STATUS_E updateCellVoltages(BmbTaskOutputData_S* bmbData)
             bmbData->bmb[k].cellVoltageFilteredStatus[(5 * CELLS_PER_REG)] = GOOD;
         }
 
-        // msgStatus = commandAll(CMD_START_CADC | ADC_CONT | ADC_RD, NUM_BMBS_IN_ACCUMULATOR);
-        // if(msgStatus != TRANSACTION_SUCCESS)
-        // {
-        //     return msgStatus;
-        // }
+        msgStatus = commandAll(CMD_START_CADC | ADC_CONT | ADC_RD, NUM_BMBS_IN_ACCUMULATOR);
+        if(msgStatus != TRANSACTION_SUCCESS)
+        {
+            return msgStatus;
+        }
 
         //Unmute S-pin
         msgStatus = commandAll(CMD_UNMUTE_DIS, NUM_BMBS_IN_ACCUMULATOR);
@@ -968,40 +1010,40 @@ static TRANSACTION_STATUS_E updateBalanceSwitches(BmbTaskOutputData_S* bmbData)
 		}
     }
 
-    uint8_t registerDataPwmA[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
-    memset(registerDataPwmA, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+    // uint8_t registerDataPwmA[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
+    // memset(registerDataPwmA, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
 
-    uint8_t registerDataPwmB[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
-    memset(registerDataPwmB, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+    // uint8_t registerDataPwmB[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
+    // memset(registerDataPwmB, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
 
-    for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
-    {
-        Bmb_S* pBmb = &pBms->bmb[i];
+    // for(int32_t i = 0; i < 1; i++)
+    // {
+    //     Bmb_S* pBmb = &pBms->bmb[i];
 
-        for(int32_t j = 0; j < NUM_PWM_REG_A; j+=2)
-        {
-            if(pBmb->balSwEnabled[j])
-            {
-                registerDataPwmA[(REGISTER_SIZE_BYTES * (NUM_BMBS_IN_ACCUMULATOR - i - 1)) + (j / 2)] |= PWM_DUTY_MASK; 
-            }
-            if(pBmb->balSwEnabled[j+1])
-            {
-                registerDataPwmA[(REGISTER_SIZE_BYTES * (NUM_BMBS_IN_ACCUMULATOR - i - 1)) + (j / 2)] |= (((uint8_t)PWM_DUTY_MASK) << 4); 
-            }
-        }
+    //     for(int32_t j = 0; j < NUM_PWM_REG_A; j+=2)
+    //     {
+    //         if(pBmb->balSwEnabled[j])
+    //         {
+    //             registerDataPwmA[(REGISTER_SIZE_BYTES * (NUM_BMBS_IN_ACCUMULATOR - i - 1)) + (j / 2)] |= PWM_DUTY_MASK; 
+    //         }
+    //         if(pBmb->balSwEnabled[j+1])
+    //         {
+    //             registerDataPwmA[(REGISTER_SIZE_BYTES * (NUM_BMBS_IN_ACCUMULATOR - i - 1)) + (j / 2)] |= (((uint8_t)PWM_DUTY_MASK) << 4); 
+    //         }
+    //     }
 
-        for(int32_t j = 0; j < NUM_PWM_REG_B; j+=2)
-        {
-            if(pBmb->balSwEnabled[j+NUM_PWM_REG_A])
-            {
-                registerDataPwmB[(REGISTER_SIZE_BYTES * i) + (j / 2)] |= PWM_DUTY_MASK; 
-            }
-            if(pBmb->balSwEnabled[j+NUM_PWM_REG_A+1])
-            {
-                registerDataPwmB[(REGISTER_SIZE_BYTES * i) + (j / 2)] |= (((uint8_t)PWM_DUTY_MASK) << 4); 
-            }
-        }
-    }
+    //     for(int32_t j = 0; j < NUM_PWM_REG_B; j+=2)
+    //     {
+    //         if(pBmb->balSwEnabled[j+NUM_PWM_REG_A])
+    //         {
+    //             registerDataPwmB[(REGISTER_SIZE_BYTES * i) + (j / 2)] |= PWM_DUTY_MASK; 
+    //         }
+    //         if(pBmb->balSwEnabled[j+NUM_PWM_REG_A+1])
+    //         {
+    //             registerDataPwmB[(REGISTER_SIZE_BYTES * i) + (j / 2)] |= (((uint8_t)PWM_DUTY_MASK) << 4); 
+    //         }
+    //     }
+    // }
 
     // TRANSACTION_STATUS_E msgStatus;
     // msgStatus = writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerDataPwmA);
@@ -1015,7 +1057,67 @@ static TRANSACTION_STATUS_E updateBalanceSwitches(BmbTaskOutputData_S* bmbData)
     //     return msgStatus;
     // }
     // return msgStatus;
-    return TRANSACTION_SUCCESS;
+    // // return TRANSACTION_SUCCESS;
+
+    uint8_t registerDataConfigB[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
+    memset(registerDataConfigB, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+
+    for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+    {
+        Bmb_S* pBmb = &pBms->bmb[i];
+
+        uint16_t mask = 0;
+        for(int32_t j = 0; j < NUM_CELLS_PER_BMB; j++)
+        {
+            if(pBmb->balSwEnabled[j])
+            {
+                mask |= (0x0001 << j);
+            }
+        }
+        // registerDataConfigB[(REGISTER_SIZE_BYTES * (NUM_BMBS_IN_ACCUMULATOR - i - 1)) + 0] = 0x00;
+        // registerDataConfigB[(REGISTER_SIZE_BYTES * (NUM_BMBS_IN_ACCUMULATOR - i - 1)) + 1] = 0xF8;
+        // registerDataConfigB[(REGISTER_SIZE_BYTES * (NUM_BMBS_IN_ACCUMULATOR - i - 1)) + 2] = 0x7F;
+        // registerDataConfigB[(REGISTER_SIZE_BYTES * (NUM_BMBS_IN_ACCUMULATOR - i - 1)) + 3] = 0x00;
+        registerDataConfigB[(REGISTER_SIZE_BYTES * (NUM_BMBS_IN_ACCUMULATOR - i - 1)) + 4] = (uint8_t)mask;
+        registerDataConfigB[(REGISTER_SIZE_BYTES * (NUM_BMBS_IN_ACCUMULATOR - i - 1)) + 5] = (uint8_t)(mask >> 8);
+    }
+    
+    TRANSACTION_STATUS_E msgStatus;
+    msgStatus = writeAll(WR_CFG_REG_B, NUM_BMBS_IN_ACCUMULATOR, registerDataConfigB);
+    if(msgStatus != TRANSACTION_SUCCESS)
+    {
+        return msgStatus;
+    }
+    return msgStatus;
+
+
+    //     for(int32_t j = 0; j < NUM_PWM_REG_B; j+=2)
+    //     {
+    //         if(pBmb->balSwEnabled[j+NUM_PWM_REG_A])
+    //         {
+    //             registerDataPwmB[(REGISTER_SIZE_BYTES * i) + (j / 2)] |= PWM_DUTY_MASK; 
+    //         }
+    //         if(pBmb->balSwEnabled[j+NUM_PWM_REG_A+1])
+    //         {
+    //             registerDataPwmB[(REGISTER_SIZE_BYTES * i) + (j / 2)] |= (((uint8_t)PWM_DUTY_MASK) << 4); 
+    //         }
+    //     }
+    // }
+
+    // TRANSACTION_STATUS_E msgStatus;
+    // msgStatus = writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerDataPwmA);
+    // if(msgStatus != TRANSACTION_SUCCESS)
+    // {
+    //     return msgStatus;
+    // }
+    // msgStatus = writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerDataPwmB);
+    // if(msgStatus != TRANSACTION_SUCCESS)
+    // {
+    //     return msgStatus;
+    // }
+    // return msgStatus;
+    // return TRANSACTION_SUCCESS;
+    
 
     // uint8_t registerDataPwmA[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
     // memset(registerDataPwmA, 0xFF, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
@@ -1066,7 +1168,7 @@ static TRANSACTION_STATUS_E runSwitchPinStateMachine(BmbTaskOutputData_S* bmbDat
         }
         checkAdcMismatch(bmbData);
         cycleCount++;
-        if(cycleCount >= 5)
+        if(cycleCount >= 1)
         {
             cycleCount = 0;
             startSadcMask = ADC_CONT | ADC_OW_EVEN;
@@ -1086,7 +1188,7 @@ static TRANSACTION_STATUS_E runSwitchPinStateMachine(BmbTaskOutputData_S* bmbDat
         }
         checkOpenWire(bmbData);
         cycleCount++;
-        if(cycleCount >= 5)
+        if(cycleCount >= 1)
         {
             cycleCount = 0;
             startSadcMask = ADC_CONT | ADC_OW_ODD;
@@ -1106,7 +1208,7 @@ static TRANSACTION_STATUS_E runSwitchPinStateMachine(BmbTaskOutputData_S* bmbDat
         }
         checkOpenWire(bmbData);
         cycleCount++;
-        if(cycleCount >= 5)
+        if(cycleCount >= 1)
         {
             cycleCount = 0;
             if(balancingEnabled)
@@ -1116,7 +1218,7 @@ static TRANSACTION_STATUS_E runSwitchPinStateMachine(BmbTaskOutputData_S* bmbDat
                 {
                     return msgStatus;
                 }
-                msgStatus = commandAll(CMD_START_SADC, NUM_BMBS_IN_ACCUMULATOR);
+                msgStatus = commandAll(CMD_START_SADC | ADC_DCP, NUM_BMBS_IN_ACCUMULATOR);
                 if(msgStatus != TRANSACTION_SUCCESS)
                 {
                     return msgStatus;
@@ -1144,7 +1246,7 @@ static TRANSACTION_STATUS_E runSwitchPinStateMachine(BmbTaskOutputData_S* bmbDat
             // {
             //     return msgStatus;
             // }
-            return TRANSACTION_SUCCESS;
+            // return TRANSACTION_SUCCESS;
         }
         else
         {
@@ -1157,11 +1259,20 @@ static TRANSACTION_STATUS_E runSwitchPinStateMachine(BmbTaskOutputData_S* bmbDat
         }
 
         cycleCount++;
-        if(cycleCount >= 85)
+        if(cycleCount >= 12)
         {
             cycleCount = 0;
             startSadcMask = ADC_CONT;
             bmbData->sPinState = SADC_REDUNDANT;
+
+            TRANSACTION_STATUS_E msgStatus;
+            uint8_t txBuffer[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
+            memset(txBuffer, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+            msgStatus = writeAll(WR_CFG_REG_B, NUM_BMBS_IN_ACCUMULATOR, txBuffer);
+            if(msgStatus != TRANSACTION_SUCCESS)
+            {
+                return msgStatus;
+            }
         }
         else
         {
@@ -1198,6 +1309,36 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb)
     return TRANSACTION_SUCCESS;
 }
 
+static void runBmbAlertMonitor(BmbTaskOutputData_S* bmbData)
+{
+    for(int32_t i = 0; i < NUM_BMB_ALERTS; i++)
+    {
+        bmbAlerts[i]->alertConditionPresent = bmbAlertConditionArray[i](bmbData);
+        runAlertMonitor(bmbAlerts[i]);
+    }
+
+    // Accumulate alert statuses
+    bool responseStatus[NUM_ALERT_RESPONSES] = { false };
+
+    // Check each alert status
+    for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
+    {
+        Alert_S* alert = bmbAlerts[i];
+        const AlertStatus_E alertStatus = getAlertStatus(alert);
+        if ((alertStatus == ALERT_SET) || (alertStatus == ALERT_LATCHED))
+        {
+            // Iterate through all alert responses and set them
+            for (uint32_t j = 0; j < alert->numAlertResponse; j++)
+            {
+                const AlertResponse_E response = alert->alertResponse[j];
+                // Set the alert response to active
+                responseStatus[response] = true;
+            }
+        }
+    }
+    setAmsFault(responseStatus[AMS_FAULT]);
+}
+
 /* ==================================================================== */
 /* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
 /* ==================================================================== */
@@ -1207,6 +1348,7 @@ void initBmbUpdateTask()
     // // TODO Remove for custom hardware where master pins tied high
     // HAL_GPIO_WritePin(MAS1_GPIO_Port, MAS1_Pin, SET);
     // HAL_GPIO_WritePin(MAS2_GPIO_Port, MAS2_Pin, SET);
+    HAL_GPIO_WritePin(AMS_FAULT_OUT_GPIO_Port, AMS_FAULT_OUT_Pin, GPIO_PIN_SET);
 }
 
 void runBmbUpdateTask()
@@ -1244,6 +1386,8 @@ void runBmbUpdateTask()
 
     status = runSwitchPinStateMachine(&bmbTaskOutputDataLocal, true);
     HANDLE_BMB_ERROR(status);    
+
+    runBmbAlertMonitor(&bmbTaskOutputData);
 
     taskENTER_CRITICAL();
     bmbTaskOutputData = bmbTaskOutputDataLocal;

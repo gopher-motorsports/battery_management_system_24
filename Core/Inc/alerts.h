@@ -23,6 +23,56 @@
 #define UNDERVOLTAGE_FAULT_ALERT_SET_TIME_MS      5000
 #define UNDERVOLTAGE_FAULT_ALERT_CLEAR_TIME_MS    5000
 
+#define MAX_CELL_IMBALANCE_V                      0.2f
+#define CELL_IMBALANCE_ALERT_SET_TIME_MS          1000
+#define CELL_IMBALANCE_ALERT_CLEAR_TIME_MS        1000
+
+#define OVERTEMPERATURE_WARNING_ALERT_SET_TIME_MS   500
+#define OVERTEMPERATURE_WARNING_ALERT_CLEAR_TIME_MS 500
+
+#define OVERTEMPERATURE_FAULT_ALERT_SET_TIME_MS     5000
+#define OVERTEMPERATURE_FAULT_ALERT_CLEAR_TIME_MS   5000
+
+#define SDC_FAULT_ALERT_SET_TIME_MS   0
+#define SDC_FAULT_ALERT_CLEAR_TIME_MS 0
+
+#define CURRENT_SENSOR_ERROR_ALERT_SET_TIME_MS        2000
+#define CURRENT_SENSOR_ERROR_ALERT_CLEAR_TIME_MS      2000
+
+#define BMB_COMMUNICATION_FAILURE_ALERT_SET_TIME_MS   5000
+#define BMB_COMMUNICATION_FAILURE_ALERT_CLEAR_TIME_MS 5000
+
+#define BAD_VOLTAGE_SENSE_STATUS_ALERT_SET_TIME_MS    2000
+#define BAD_VOLTAGE_SENSE_STATUS_ALERT_CLEAR_TIME_MS  2000
+
+#define BAD_BRICK_TEMP_SENSE_STATUS_ALERT_SET_TIME_MS    1000
+#define BAD_BRICK_TEMP_SENSE_STATUS_ALERT_CLEAR_TIME_MS  1000
+
+#define BAD_BOARD_TEMP_SENSE_STATUS_ALERT_SET_TIME_MS    1000
+#define BAD_BOARD_TEMP_SENSE_STATUS_ALERT_CLEAR_TIME_MS  1000
+
+// The minimum percent of brick temps that must be monitored to pass rules
+#define MIN_PERCENT_BRICK_TEMPS_MONITORED             25
+#define INSUFFICIENT_TEMP_SENSOR_ALERT_SET_TIME_MS    5000
+#define INSUFFICIENT_TEMP_SENSOR_ALERT_CLEAR_TIME_MS  5000
+
+#define STACK_VS_SEGMENT_IMBALANCE_ALERT_SET_TIME_MS    1000
+#define STACK_VS_SEGMENT_IMBALANCE_ALERT_CLEAR_TIME_MS  1000
+
+#define CHARGER_OVERVOLTAGE_ALERT_SET_TIME_MS      2000
+#define CHARGER_OVERVOLTAGE_ALERT_CLEAR_TIME_MS    2000
+
+#define CHARGER_OVERCURRENT_ALERT_SET_TIME_MS      2000
+#define CHARGER_OVERCURRENT_ALERT_CLEAR_TIME_MS    2000
+
+#define CHARGER_VOLTAGE_MISMATCH_ALERT_SET_TIME_MS      2000
+#define CHARGER_VOLTAGE_MISMATCH_ALERT_CLEAR_TIME_MS    2000
+
+#define CHARGER_CURRENT_MISMATCH_ALERT_SET_TIME_MS      2000
+#define CHARGER_CURRENT_MISMATCH_ALERT_CLEAR_TIME_MS    2000
+
+#define CHARGER_DIAGNOSTIC_ALERT_SET_TIME_MS      2000
+#define CHARGER_DIAGNOSTIC_ALERT_CLEAR_TIME_MS    2000
 
 /* ==================================================================== */
 /* ========================= ENUMERATED TYPES========================== */
@@ -50,7 +100,7 @@ typedef enum
 /* ============================== STRUCTS============================== */
 /* ==================================================================== */
 
-
+typedef bool (*bmbAlertCondition)(BmbTaskOutputData_S* bmbData);
 
 typedef struct
 {
@@ -74,13 +124,16 @@ typedef struct
 } Alert_S;
 
 
+
 /* ==================================================================== */
 /* ======================= EXTERNAL VARIABLES ========================= */
 /* ==================================================================== */
 // The total number of alerts
-extern const uint32_t NUM_ALERTS; 
+extern const uint32_t NUM_BMB_ALERTS; 
 // Array of all alert structs
-extern Alert_S* alerts[];
+extern Alert_S* bmbAlerts[];
+
+extern bmbAlertCondition bmbAlertConditionArray[];
 
 
 /* ==================================================================== */
@@ -100,5 +153,7 @@ AlertStatus_E getAlertStatus(Alert_S* alert);
   @param   alert - The Alert data structure
 */
 void runAlertMonitor(Alert_S* alert);
+
+void setAmsFault(bool set);
 
 #endif /* INC_ALERTS_H_ */

@@ -45,7 +45,7 @@
     /* Block calling task and wait for external interrupt to occur */ \
     if (xTaskNotifyWait(TASK_NO_OP, TASK_CLEAR_FLAGS, &notificationFlags, timeout) != pdTRUE) \
     { /* External interrupt has failed to occur */ \
-      DebugComm("External interrupt failed to occur in %s!\n", #callingFunc); \
+      Debug("External interrupt failed to occur in %s!\n", #callingFunc); \
     } \
     /* Macro will evaluate to this value - can be used as a return value to handle EXTI failures further */ \
     (INTERRUPT_STATUS_E) notificationFlags; \

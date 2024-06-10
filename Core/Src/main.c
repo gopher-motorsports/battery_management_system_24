@@ -23,9 +23,12 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "printTask.h"
+#include "chargerTask.h"
+#include "idleTask.h"
 #include "spi.h"
 #include <stdint.h>
 #include <stdio.h>
+// #include "GopherCAN.h"
 
 /* USER CODE END Includes */
 
@@ -44,39 +47,66 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
+
+CAN_HandleTypeDef hcan1;
+CAN_HandleTypeDef hcan2;
+
 I2C_HandleTypeDef hi2c3;
 
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart1;
 
 osThreadId bmbUpdateTaskHandle;
-uint32_t bmbUpdateTaskBuffer[ 1024 ];
+uint32_t bmbUpdateTaskBuffer[ 2048 ];
 osStaticThreadDef_t bmbUpdateTaskControlBlock;
 osThreadId printTaskHandle;
-uint32_t printTaskBuffer[ 1024 ];
+uint32_t printTaskBuffer[ 2048 ];
 osStaticThreadDef_t printTaskControlBlock;
 osThreadId lowPriTaskHandle;
 uint32_t lowPriTaskBuffer[ 512 ];
 osStaticThreadDef_t lowPriTaskControlBlock;
+osThreadId chargerTaskHandle;
+uint32_t chargerTaskBuffer[ 1024 ];
+osStaticThreadDef_t chargerTaskControlBlock;
+osThreadId idleTaskHandle;
+uint32_t idleTaskBuffer[ 128 ];
+osStaticThreadDef_t idleTaskControlBlock;
 /* USER CODE BEGIN PV */
 
 BmbTaskOutputData_S bmbTaskOutputData;
+Charger_Data_S chargerTaskOutputData;
+
+volatile bool EVSEConnected = false;
+volatile uint32_t EVSELastUpdate = 0;
+volatile bool chargerConnected = false;
+volatile bool newChargerMessage = false;
+volatile uint8_t chargerMessage[5];
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_I2C3_Init(void);
+static void MX_CAN1_Init(void);
+static void MX_TIM4_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_CAN2_Init(void);
 void StartBmbUpdateTask(void const * argument);
 void StartPrintTask(void const * argument);
 void StartLowPriTask(void const * argument);
+void StartChargerTask(void const * argument);
+void StartIdleTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 #ifdef __GNUC__
@@ -136,6 +166,113 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 	}
 }
 
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+  if((htim == &htim4) && (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2))
+  {
+    EVSEConnected = true;
+    EVSELastUpdate = HAL_GetTick();
+    __HAL_TIM_SET_COUNTER(htim, 0);
+    
+    // static bool firstCapture = true;
+    // static uint32_t icVal1 = 0;
+    // if(!firstCapture)
+    // {
+    //   icVal1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
+    //   firstCapture = false;
+    // }
+    // else
+    // {
+    //   uint32_t icVal2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
+    //   if(icVal2 > icVal1)
+    //   {
+
+    //   }
+    // }
+    
+  }
+
+
+	// if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)  // if the interrupt source is channel1
+	// {
+	// 	if (Is_First_Captured==0) // if the first value is not captured
+	// 	{
+	// 		IC_Val1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1); // read the first value
+	// 		Is_First_Captured = 1;  // set the first captured as true
+	// 	}
+
+	// 	else   // if the first is already captured
+	// 	{
+	// 		IC_Val2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);  // read second value
+
+	// 		if (IC_Val2 > IC_Val1)
+	// 		{
+	// 			Difference = IC_Val2-IC_Val1;
+	// 		}
+
+	// 		else if (IC_Val1 > IC_Val2)
+	// 		{
+	// 			Difference = (0xffffffff - IC_Val1) + IC_Val2;
+	// 		}
+
+	// 		float refClock = TIMCLOCK/(PRESCALAR);
+	// 		float mFactor = 1000000/refClock;
+
+	// 		usWidth = Difference*mFactor;
+
+	// 		__HAL_TIM_SET_COUNTER(htim, 0);  // reset the counter
+	// 		Is_First_Captured = 0; // set it back to false
+	// 	}
+	// }
+}
+
+// void GCAN_RxMsgPendingCallback(CAN_HandleTypeDef *hcan, U32 fifo_num)
+// {
+//   // Charger CAN
+//   if(hcan == &hcan1)
+//   {
+//     CAN_RxHeaderTypeDef rxHeader;
+//     uint8_t rxData[8];
+    
+//     HAL_CAN_GetRxMessage(hcan, fifo_num, &rxHeader, rxData);
+//     if ((rxHeader.ExtId == CHARGER_CAN_ID_RX) && (rxHeader.DLC == 8))
+//     {
+//       for (int32_t i = 0; i < 5; i++)
+//       {
+//         chargerMessage[i] = rxData[i];
+//       }
+//       newChargerMessage = true;
+//     }
+//   }
+
+//   // Gopher CAN
+//   if(hcan == &hcan2)
+//   {
+//     service_can_rx_hardware(hcan, fifo_num);
+//   }
+// }
+
+// void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan)
+// {
+//   // Charger CAN
+//   if(hcan == &hcan1)
+//   {
+//     CAN_RxHeaderTypeDef rxHeader;
+//     uint8_t rxData[8];
+    
+//     HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData);
+//     if ((rxHeader.ExtId == CHARGER_CAN_ID_RX) && (rxHeader.DLC == 8))
+//     {
+//       for (int32_t i = 0; i < 5; i++)
+//       {
+//         chargerMessage[i] = rxData[i];
+//       }
+//       newChargerMessage = true;
+//       chargerConnected = true;
+//     }
+//   }
+// }
+
 /* USER CODE END 0 */
 
 /**
@@ -166,11 +303,22 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   MX_TIM3_Init();
   MX_I2C3_Init();
+  MX_CAN1_Init();
+  MX_TIM4_Init();
+  MX_ADC1_Init();
+  MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
+  // S8 init_can(&hcan2, GCAN0);
+  HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2);
+
+  // Activate Charger CAN RX MSG PENDING notification
+  // HAL_CAN_Start(&hcan1);
+  // HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
   /* USER CODE END 2 */
 
@@ -192,16 +340,24 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of bmbUpdateTask */
-  osThreadStaticDef(bmbUpdateTask, StartBmbUpdateTask, osPriorityNormal, 0, 1024, bmbUpdateTaskBuffer, &bmbUpdateTaskControlBlock);
+  osThreadStaticDef(bmbUpdateTask, StartBmbUpdateTask, osPriorityNormal, 0, 2048, bmbUpdateTaskBuffer, &bmbUpdateTaskControlBlock);
   bmbUpdateTaskHandle = osThreadCreate(osThread(bmbUpdateTask), NULL);
 
   /* definition and creation of printTask */
-  osThreadStaticDef(printTask, StartPrintTask, osPriorityIdle, 0, 1024, printTaskBuffer, &printTaskControlBlock);
+  osThreadStaticDef(printTask, StartPrintTask, osPriorityBelowNormal, 0, 2048, printTaskBuffer, &printTaskControlBlock);
   printTaskHandle = osThreadCreate(osThread(printTask), NULL);
 
   /* definition and creation of lowPriTask */
   osThreadStaticDef(lowPriTask, StartLowPriTask, osPriorityLow, 0, 512, lowPriTaskBuffer, &lowPriTaskControlBlock);
   lowPriTaskHandle = osThreadCreate(osThread(lowPriTask), NULL);
+
+  /* definition and creation of chargerTask */
+  osThreadStaticDef(chargerTask, StartChargerTask, osPriorityAboveNormal, 0, 1024, chargerTaskBuffer, &chargerTaskControlBlock);
+  chargerTaskHandle = osThreadCreate(osThread(chargerTask), NULL);
+
+  /* definition and creation of idleTask */
+  osThreadStaticDef(idleTask, StartIdleTask, osPriorityIdle, 0, 128, idleTaskBuffer, &idleTaskControlBlock);
+  idleTaskHandle = osThreadCreate(osThread(idleTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -266,6 +422,140 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 2;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Rank = 2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief CAN1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CAN1_Init(void)
+{
+
+  /* USER CODE BEGIN CAN1_Init 0 */
+
+  /* USER CODE END CAN1_Init 0 */
+
+  /* USER CODE BEGIN CAN1_Init 1 */
+
+  /* USER CODE END CAN1_Init 1 */
+  hcan1.Instance = CAN1;
+  hcan1.Init.Prescaler = 20;
+  hcan1.Init.Mode = CAN_MODE_NORMAL;
+  hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
+  hcan1.Init.TimeSeg1 = CAN_BS1_6TQ;
+  hcan1.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan1.Init.TimeTriggeredMode = DISABLE;
+  hcan1.Init.AutoBusOff = ENABLE;
+  hcan1.Init.AutoWakeUp = DISABLE;
+  hcan1.Init.AutoRetransmission = DISABLE;
+  hcan1.Init.ReceiveFifoLocked = DISABLE;
+  hcan1.Init.TransmitFifoPriority = DISABLE;
+  if (HAL_CAN_Init(&hcan1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CAN1_Init 2 */
+
+  /* USER CODE END CAN1_Init 2 */
+
+}
+
+/**
+  * @brief CAN2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CAN2_Init(void)
+{
+
+  /* USER CODE BEGIN CAN2_Init 0 */
+
+  /* USER CODE END CAN2_Init 0 */
+
+  /* USER CODE BEGIN CAN2_Init 1 */
+
+  /* USER CODE END CAN2_Init 1 */
+  hcan2.Instance = CAN2;
+  hcan2.Init.Prescaler = 5;
+  hcan2.Init.Mode = CAN_MODE_NORMAL;
+  hcan2.Init.SyncJumpWidth = CAN_SJW_1TQ;
+  hcan2.Init.TimeSeg1 = CAN_BS1_6TQ;
+  hcan2.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan2.Init.TimeTriggeredMode = DISABLE;
+  hcan2.Init.AutoBusOff = ENABLE;
+  hcan2.Init.AutoWakeUp = ENABLE;
+  hcan2.Init.AutoRetransmission = DISABLE;
+  hcan2.Init.ReceiveFifoLocked = DISABLE;
+  hcan2.Init.TransmitFifoPriority = DISABLE;
+  if (HAL_CAN_Init(&hcan2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CAN2_Init 2 */
+
+  /* USER CODE END CAN2_Init 2 */
+
 }
 
 /**
@@ -415,6 +705,64 @@ static void MX_TIM3_Init(void)
 }
 
 /**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_IC_InitTypeDef sConfigIC = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 80-1;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 65535;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_IC_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_BOTHEDGE;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim4, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -448,6 +796,22 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA2_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -459,15 +823,33 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, AMS_FAULT_OUT_Pin|MCU_FAULT_Pin|MCU_HEARTBEAT_Pin|CP_EN_Pin
+                          |PORTB_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(PORTB_CS_GPIO_Port, PORTB_CS_Pin, GPIO_PIN_RESET);
+  /*Configure GPIO pins : AMS_FAULT_OUT_Pin MCU_FAULT_Pin MCU_HEARTBEAT_Pin CP_EN_Pin
+                           PORTB_CS_Pin */
+  GPIO_InitStruct.Pin = AMS_FAULT_OUT_Pin|MCU_FAULT_Pin|MCU_HEARTBEAT_Pin|CP_EN_Pin
+                          |PORTB_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : AMS_FAULT_SDC_Pin BSPD_FAULT_SDC_Pin */
+  GPIO_InitStruct.Pin = AMS_FAULT_SDC_Pin|BSPD_FAULT_SDC_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PORTA_CS_Pin */
   GPIO_InitStruct.Pin = PORTA_CS_Pin;
@@ -476,12 +858,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(PORTA_CS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PORTB_CS_Pin */
-  GPIO_InitStruct.Pin = PORTB_CS_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  /*Configure GPIO pin : IMD_FAULT_SDC_Pin */
+  GPIO_InitStruct.Pin = IMD_FAULT_SDC_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(PORTB_CS_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(IMD_FAULT_SDC_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -551,6 +932,50 @@ void StartLowPriTask(void const * argument)
     osDelay(1);
   }
   /* USER CODE END StartLowPriTask */
+}
+
+/* USER CODE BEGIN Header_StartChargerTask */
+/**
+* @brief Function implementing the chargerTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartChargerTask */
+void StartChargerTask(void const * argument)
+{
+  /* USER CODE BEGIN StartChargerTask */
+  /* Infinite loop */
+  
+  initChargerTask();
+  // TickType_t lastChargerTaskTick = HAL_GetTick();
+  const TickType_t chargerTaskPeriod = pdMS_TO_TICKS(CHARGER_TASK_PERIOD_MS);
+  for(;;)
+  {
+    runChargerTask();
+    // vTaskDelayUntil(&lastChargerTaskTick, chargerTaskPeriod);
+    osDelay(chargerTaskPeriod);
+  }
+  /* USER CODE END StartChargerTask */
+}
+
+/* USER CODE BEGIN Header_StartIdleTask */
+/**
+* @brief Function implementing the idleTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartIdleTask */
+void StartIdleTask(void const * argument)
+{
+  /* USER CODE BEGIN StartIdleTask */
+  /* Infinite loop */
+  idleInit();
+  for(;;)
+  {
+    runIdle();
+    osDelay(1);
+  }
+  /* USER CODE END StartIdleTask */
 }
 
 /**

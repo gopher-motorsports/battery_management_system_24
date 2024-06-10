@@ -289,13 +289,14 @@ static TRANSACTION_STATUS_E writeRegister(uint16_t command, uint32_t numBmbs, ui
     txBuffer[2] = (uint8_t)(commandCRC >> BITS_IN_BYTE);
     txBuffer[3] = (uint8_t)(commandCRC);
 
-    // Calculate the CRC on the register data packet (2 byte CRC on 6 byte packet)
-    uint16_t dataCRC = calculateDataCrc(txBuff, REGISTER_SIZE_BYTES, 0);
-
     // For each bmb, append a copy of the register data and corresponding CRC to the tx buffer  
     for(int32_t i = 0; i < numBmbs; i++)
     {
-        memcpy(txBuffer + COMMAND_PACKET_LENGTH + (i * REGISTER_PACKET_LENGTH), txBuff, REGISTER_SIZE_BYTES);
+        memcpy(txBuffer + COMMAND_PACKET_LENGTH + (i * REGISTER_PACKET_LENGTH), txBuff + (i * REGISTER_SIZE_BYTES), REGISTER_SIZE_BYTES);
+
+        // Calculate the CRC on the register data packet (2 byte CRC on 6 byte packet)
+        uint16_t dataCRC = calculateDataCrc(txBuff + (i * REGISTER_SIZE_BYTES), REGISTER_SIZE_BYTES, 0);
+
         txBuffer[COMMAND_PACKET_LENGTH + (i * REGISTER_PACKET_LENGTH) + REGISTER_SIZE_BYTES] = (uint8_t)(dataCRC >> BITS_IN_BYTE);;
         txBuffer[COMMAND_PACKET_LENGTH + (i * REGISTER_PACKET_LENGTH) + REGISTER_SIZE_BYTES + 1] = (uint8_t)(dataCRC);;
     }
@@ -467,7 +468,15 @@ static TRANSACTION_STATUS_E writeAndVerifyRegister(uint16_t command, uint32_t nu
         for(int32_t readAttempt = 0; readAttempt < 2; readAttempt++)
         {
             uint8_t rxBuff[REGISTER_SIZE_BYTES * numBmbs];
-            TRANSACTION_STATUS_E readStatus = readRegister(command + 1, numBmbs, rxBuff, port);
+            TRANSACTION_STATUS_E readStatus;
+            if(command == 0x0020 || command == 0x0021)
+            {
+                readStatus = readRegister(command + 2, numBmbs, rxBuff, port);
+            }
+            else
+            {
+                readStatus = readRegister(command + 1, numBmbs, rxBuff, port);
+            }
 
             if(readStatus == TRANSACTION_SUCCESS)
             {
