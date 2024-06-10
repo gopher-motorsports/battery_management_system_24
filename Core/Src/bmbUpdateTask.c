@@ -762,9 +762,9 @@ static void aggregatePackData(BmbTaskOutputData_S* bmbData)
 	pBms->maxCellVoltage = maxCellVoltage;
 	pBms->minCellVoltage = minCellVoltage;
 	pBms->avgBrickV = avgCellVoltageSum / NUM_BMBS_IN_ACCUMULATOR;
-	pBms->maxCellVoltage = maxCellVoltage;
-	pBms->minCellVoltage = minCellVoltage;
-	pBms->avgBrickTemp = avgCellTempSum / NUM_BMBS_IN_ACCUMULATOR;
+	pBms->maxCellTemp = maxCellTemp;
+	pBms->minCellTemp = minCellTemp;
+	pBms->avgCellTemp = avgCellTempSum / NUM_BMBS_IN_ACCUMULATOR;
 	pBms->maxBoardTemp = maxBoardTemp;
 	pBms->minBoardTemp = minBoardTemp;
     pBms->avgBoardTemp = (numGoodBoardTemp == 0) ? pBms->avgBoardTemp : avgBoardTempSum / numGoodBoardTemp;

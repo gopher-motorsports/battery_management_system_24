@@ -100,9 +100,9 @@ typedef struct
 	float minCellVoltage;
 	float avgBrickV;
 
-	float maxBrickTemp;
-	float minBrickTemp;
-	float avgBrickTemp;
+	float maxCellTemp;
+	float minCellTemp;
+	float avgCellTemp;
 
 	float maxBoardTemp;
 	float minBoardTemp;

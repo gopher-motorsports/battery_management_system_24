@@ -344,6 +344,8 @@ void runPrintTask()
     printf("\e[1;1H\e[2J");
     printCellVoltages(printTaskInputData.bmbTaskData.bmb);
     printCellTemps(printTaskInputData.bmbTaskData.bmb);
+
+    printf("Min Cell V: %f\n", printTaskInputData.bmbTaskData.minCellVoltage);
     // printTestData(printTaskInputData.bmbTaskData.bmb);
     // printActiveAlerts();
 }
