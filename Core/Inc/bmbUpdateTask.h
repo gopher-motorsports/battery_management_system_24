@@ -12,7 +12,7 @@
 /* ============================= DEFINES ============================== */
 /* ==================================================================== */
 
-#define NUM_BMBS_IN_ACCUMULATOR     1
+#define NUM_BMBS_IN_ACCUMULATOR     2
 #define NUM_CELLS_PER_BMB           16
 
 /* ==================================================================== */
@@ -31,15 +31,9 @@ typedef enum
     SADC_REDUNDANT = 0,
     SADC_OW_EVEN,
     SADC_OW_ODD,
-    SADC_PAUSE_1,
-    SADC_PAUSE_2,
-    SADC_PAUSE_3,
-    SADC_PAUSE_4,
-    SADC_PAUSE_5,
-    SADC_PAUSE_6,
-    SADC_PAUSE_7,
-    NUM_SADC_STATES
-} SADC_STATE_E;
+    SW_BALANCE,
+    NUM_S_PIN_STATES
+} S_PIN_STATE_E;
 
 /* ==================================================================== */
 /* ============================== STRUCTS ============================= */
@@ -62,6 +56,7 @@ typedef struct
     SENSOR_STATUS_E cellVoltageRedundantStatus[NUM_CELLS_PER_BMB];
     float cellVoltageRedundant[NUM_CELLS_PER_BMB];
     bool adcMismatch[NUM_CELLS_PER_BMB];
+    uint16_t openAdcMask;
     bool openWire[NUM_CELLS_PER_BMB+1];
 
     SENSOR_STATUS_E cellTempStatus[NUM_CELLS_PER_BMB];
@@ -69,15 +64,50 @@ typedef struct
 
     SENSOR_STATUS_E boardTempStatus;
     float boardTemp;
+
+    SENSOR_STATUS_E dieTempStatus;
+    float dieTemp;
+
+    float maxCellVoltage;
+    float minCellVoltage;
+    float sumCellVoltage;
+    float avgCellVoltage;
+    uint32_t numBadCellV;
+
+    float maxCellTemp;
+    float minCellTemp;
+    float avgCellTemp;
+    uint32_t numBadCellTemp;
+
+    // Balancing Configuration
+	bool balSwRequested[NUM_CELLS_PER_BMB];	// Set by BMS to determine which cells need to be balanced
+	bool balSwEnabled[NUM_CELLS_PER_BMB];
     
 } Bmb_S;
 
 typedef struct
 {
 	Bmb_S bmb[NUM_BMBS_IN_ACCUMULATOR];
-    SADC_STATE_E sadcState;
-    float maxCellVoltage;
-    float minCellVoltage;
+    S_PIN_STATE_E sPinState;
+    // float maxCellVoltage;
+    // float minCellVoltage;
+    // uint8_t minCellLocationBmb;
+    // uint8_t minCellLocation;
+
+    float accumulatorVoltage;
+
+	float maxCellVoltage;
+	float minCellVoltage;
+	float avgBrickV;
+
+	float maxBrickTemp;
+	float minBrickTemp;
+	float avgBrickTemp;
+
+	float maxBoardTemp;
+	float minBoardTemp;
+	float avgBoardTemp;
+		// Set by BMB based on ability to balance in hardware
 } BmbTaskOutputData_S;
 
 /* ==================================================================== */

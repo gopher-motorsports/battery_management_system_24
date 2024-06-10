@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include "debug.h"
 #include "alerts.h"
+#include "packData.h"
+#include "bmbUtils.h"
 
 /* ==================================================================== */
 /* ============================= DEFINES ============================== */
@@ -65,12 +67,14 @@
 #define READ_AUX_REG_C          0x001B
 #define NUM_AUX_REG             3
 
+#define READ_STAT_REG_A         0x0030
+
 #define WR_PWM_A                0x0020
 #define WR_PWM_B                0x0021
 
 #define TEMPS_PER_MUX           8
 #define CELLS_PER_REG           3
-#define CELL_REG_SIZE           REGISTER_SIZE_BYTES / CELLS_PER_REG
+#define CELL_REG_SIZE           REGISTER_SIZE_BYTES / CELLS_PER_REG     
 
 #define ADC_RESOLUTION          0.00015f
 #define ADC_OFFSET_VOLT         1.5f
@@ -80,8 +84,29 @@
 
 #define TEST_REG                0x002C
 
+#define SADC_DIAG_PERIOD_MS     100
+#define SADC_DIAG_PERIOD_CYC    (SADC_DIAG_PERIOD_MS < BMB_UPDATE_TASK_PERIOD_MS) ? (1) : (SADC_DIAG_PERIOD_MS / BMB_UPDATE_TASK_PERIOD_MS)
+
+#define BALANCE_DIAG_PERIOD_MS  10000
+#define BALANCE_DIAG_PERIOD_CYC (BALANCE_DIAG_PERIOD_MS < BMB_UPDATE_TASK_PERIOD_MS) ? (1) : (BALANCE_DIAG_PERIOD_MS / BMB_UPDATE_TASK_PERIOD_MS)
+
 // The number of values contained in a lookup table
 #define LUT_SIZE 33
+
+#define MAX_BRICK_VOLTAGE_READING 5.0f
+#define MIN_BRICK_VOLTAGE_READING 0.0f
+
+#define MAX_TEMP_SENSE_READING 	  120.0f
+#define MIN_TEMP_SENSE_READING	  (-40.0f)
+
+// The minimum voltage that we can bleed to
+#define MIN_BLEED_TARGET_VOLTAGE_V 			3.5f
+
+// Max allowable voltage difference between bricks for balancing
+#define BALANCE_THRESHOLD_V					0.001f
+
+// The maximum cell temperature where bleeding is allowed
+#define MAX_CELL_TEMP_BLEEDING_ALLOWED_C	55.0f
 
 /* ==================================================================== */
 /* ========================= ENUMERATED TYPES========================== */
@@ -138,7 +163,7 @@ const float temperatureArray[LUT_SIZE] =
 			 30, 25, 20, 15, 10, 5, 0, -5, -10, -15, -20, -25, -30, -35, -40};
 
 const float cellTempVoltageArray[LUT_SIZE] =
-			{0.1741318359, 0.193533737, 0.2155192602, 0.2404628241, 0.2687907644, 0.3009857595, 0.3375901116, 0.3792069573, 0.4264981201, 0.480176881, 0.5409934732, 0.6097106855, 0.6870667304, 0.7737227417, 0.870193244, 0.976760075, 1.093373849, 1.219552143, 1.354289544, 1.496, 1.642514054, 1.791149899, 1.938865924, 2.082484747, 2.218959086, 2.345635446, 2.460468742, 2.562151894, 2.650145243, 2.724613713, 2.786297043, 2.836345972, 2.87615517};
+			{0.2919345638, 0.324518624, 0.3612309495, 0.402585263, 0.4491372839, 0.5014774689, 0.5602182763, 0.6259742709, 0.699333326, 0.7808173945, 0.8708320017, 0.969604948, 1.077116849, 1.193029083, 1.316618141, 1.44672857, 1.581758437, 1.71969016, 1.85817452, 1.994666667, 2.126601617, 2.25158619, 2.367578393, 2.473026369, 2.566947369, 2.648940056, 2.719136612, 2.778110865, 2.826762844, 2.866199204, 2.897624362, 2.922251328, 2.941235685};
 
 const float boardTempVoltageArray[LUT_SIZE] =
 			{0.1741318359, 0.193533737, 0.2155192602, 0.2404628241, 0.2687907644, 0.3009857595, 0.3375901116, 0.3792069573, 0.4264981201, 0.480176881, 0.5409934732, 0.6097106855, 0.6870667304, 0.7737227417, 0.870193244, 0.976760075, 1.093373849, 1.219552143, 1.354289544, 1.496, 1.642514054, 1.791149899, 1.938865924, 2.082484747, 2.218959086, 2.345635446, 2.460468742, 2.562151894, 2.650145243, 2.724613713, 2.786297043, 2.836345972, 2.87615517};
@@ -152,10 +177,17 @@ LookupTable_S boardTempTable = { .length = LUT_SIZE, .x = boardTempVoltageArray,
 
 static bool initBmbs();
 static TRANSACTION_STATUS_E updateCellVoltages(Bmb_S* bmb);
-static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData);
 static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb);
 static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb);
-static TRANSACTION_STATUS_E balanceAll(Bmb_S* bmb);
+// static void aggregateBmbData(Bmb_S* bmb);
+// static void aggregatePackData(BmbTaskOutputData_S* bmbData);
+// static TRANSACTION_STATUS_E balanceAll(Bmb_S* bmb);
+
+static TRANSACTION_STATUS_E updateSADC(BmbTaskOutputData_S* bmbData);
+static void checkAdcMismatch(BmbTaskOutputData_S* bmbData);
+static void checkOpenWire(BmbTaskOutputData_S* bmbData);
+static TRANSACTION_STATUS_E updateBalanceSwitches(BmbTaskOutputData_S* bmbData);
+static TRANSACTION_STATUS_E runSwitchPinStateMachine(BmbTaskOutputData_S* bmbData, bool balancingEnabled);
 
 /* ==================================================================== */
 /* ============================== MACROS ============================== */
@@ -227,53 +259,25 @@ static bool initBmbs()
 static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb)
 {
     // Hold current state of off-chip analog MUX 
-    static MUX_STATE_E muxState = MUX_STATE_0;
+    // static MUX_STATE_E muxState = MUX_STATE_0;
 
 
     // Create a register buffer for read transactions
     uint8_t registerData[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
     TRANSACTION_STATUS_E msgStatus;
 
-    for(int32_t i = 0; i < NUM_AUX_REG-1; i++)
-    {
-        // Clear register buffer
-        memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
-
-        // Read aux register from all BMBs
-        msgStatus = readAll(readAuxReg[i], NUM_BMBS_IN_ACCUMULATOR, registerData);
-        if(msgStatus != TRANSACTION_SUCCESS)
-        {
-            return msgStatus;
-        }
-
-        // Sort through aux registers and populate BMB struct cell temps
-        for(int32_t j = 0; j < CELLS_PER_REG; j++)
-        {
-            for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
-            {
-                // Extract 16bit ADC from register
-                uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
-                uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
-                uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-
-                // Convert ADC to temp and populate bmb struct 
-                bmb[k].cellTemp[(muxState) + 2 * ((i * CELLS_PER_REG) + j)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
-                bmb[k].cellTempStatus[(muxState) + 2 * ((i * CELLS_PER_REG) + j)] = GOOD;
-            }
-        }
-    }
-
+    // Read Aux A
     // Clear register buffer
     memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
 
     // Read aux register from all BMBs
-    msgStatus = readAll(readAuxReg[2], NUM_BMBS_IN_ACCUMULATOR, registerData);
+    msgStatus = readAll(readAuxReg[0], NUM_BMBS_IN_ACCUMULATOR, registerData);
     if(msgStatus != TRANSACTION_SUCCESS)
     {
         return msgStatus;
     }
 
-    // Sort through aux register and populate BMB struct cell temps
+    // Sort through aux registers and populate BMB struct cell temps
     for(int32_t j = 0; j < CELLS_PER_REG-1; j++)
     {
         for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
@@ -284,8 +288,62 @@ static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb)
             uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
 
             // Convert ADC to temp and populate bmb struct 
-            bmb[k].cellTemp[(muxState) + 2 * ((2 * CELLS_PER_REG) + j)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
-            bmb[k].cellTempStatus[(muxState) + 2 * ((2 * CELLS_PER_REG) + j)] = GOOD;
+            bmb[k].cellTemp[((j * 2) + 3)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
+            bmb[k].cellTempStatus[((j * 2) + 3)] = GOOD;
+        }
+    }
+
+    // Read Aux B
+    // Clear register buffer
+    memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+
+    // Read aux register from all BMBs
+    msgStatus = readAll(readAuxReg[1], NUM_BMBS_IN_ACCUMULATOR, registerData);
+    if(msgStatus != TRANSACTION_SUCCESS)
+    {
+        return msgStatus;
+    }
+
+    // Sort through aux registers and populate BMB struct cell temps
+    for(int32_t j = 0; j < CELLS_PER_REG; j++)
+    {
+        for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
+        {
+            // Extract 16bit ADC from register
+            uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
+            uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
+            uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
+
+            // Convert ADC to temp and populate bmb struct 
+            bmb[k].cellTemp[((j * 2) + 7)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
+            bmb[k].cellTempStatus[((j * 2) + 7)] = GOOD;
+        }
+    }
+
+    // Read Aux C
+    // Clear register buffer
+    memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+
+    // Read aux register from all BMBs
+    msgStatus = readAll(readAuxReg[2], NUM_BMBS_IN_ACCUMULATOR, registerData);
+    if(msgStatus != TRANSACTION_SUCCESS)
+    {
+        return msgStatus;
+    }
+
+    // Sort through aux registers and populate BMB struct cell temps
+    for(int32_t j = 0; j < CELLS_PER_REG-1; j++)
+    {
+        for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
+        {
+            // Extract 16bit ADC from register
+            uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
+            uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
+            uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
+
+            // Convert ADC to temp and populate bmb struct 
+            bmb[k].cellTemp[((j * 2) + 13)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
+            bmb[k].cellTempStatus[((j * 2) + 13)] = GOOD;
         }
     }
 
@@ -302,17 +360,109 @@ static TRANSACTION_STATUS_E updateCellTemps(Bmb_S* bmb)
         bmb[k].boardTempStatus = GOOD;
     }
 
-    // Cycle mux state
-    muxState++;
-    muxState %= NUM_MUX_STATES;
+    // Read Stat A
+    // Clear register buffer
+    memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
 
-    uint8_t data[6] = {0x01, 0x00, 0x00, 0xFF, 0x00, 0x00};
-    data[4] = ((uint8_t)muxState << 1) | (0x01);
-    msgStatus = writeAll(WR_CFG_REG_A, NUM_BMBS_IN_ACCUMULATOR, data);
-    if((msgStatus != TRANSACTION_SUCCESS) && (msgStatus != TRANSACTION_CRC_ERROR) && (msgStatus != TRANSACTION_WRITE_REJECT) && (msgStatus != TRANSACTION_COMMAND_COUNTER_ERROR))
+    // Read stat register from all BMBs
+    msgStatus = readAll(READ_STAT_REG_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
+    if(msgStatus != TRANSACTION_SUCCESS)
     {
         return msgStatus;
     }
+
+    // Sort through stat registers and populate BMB struct die temps
+    for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
+    {
+        // Extract 16bit ADC from register
+        uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (CELL_REG_SIZE)];
+        uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (CELL_REG_SIZE) + 1];
+        uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
+
+        // Convert ADC to temp and populate bmb struct 
+        bmb[k].dieTemp = CONVERT_DIE_TEMP(rawAdc);
+        bmb[k].dieTempStatus = GOOD;
+    }
+
+    // for(int32_t i = 0; i < NUM_AUX_REG-1; i++)
+    // {
+    //     // Clear register buffer
+    //     memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+
+    //     // Read aux register from all BMBs
+    //     msgStatus = readAll(readAuxReg[i], NUM_BMBS_IN_ACCUMULATOR, registerData);
+    //     if(msgStatus != TRANSACTION_SUCCESS)
+    //     {
+    //         return msgStatus;
+    //     }
+
+    //     // Sort through aux registers and populate BMB struct cell temps
+    //     for(int32_t j = 0; j < CELLS_PER_REG; j++)
+    //     {
+    //         for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
+    //         {
+    //             // Extract 16bit ADC from register
+    //             uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
+    //             uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
+    //             uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
+
+    //             // Convert ADC to temp and populate bmb struct 
+    //             bmb[k].cellTemp[(muxState) + 2 * ((i * CELLS_PER_REG) + j)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
+    //             bmb[k].cellTempStatus[(muxState) + 2 * ((i * CELLS_PER_REG) + j)] = GOOD;
+    //         }
+    //     }
+    // }
+
+    // // Clear register buffer
+    // memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+
+    // // Read aux register from all BMBs
+    // msgStatus = readAll(readAuxReg[2], NUM_BMBS_IN_ACCUMULATOR, registerData);
+    // if(msgStatus != TRANSACTION_SUCCESS)
+    // {
+    //     return msgStatus;
+    // }
+
+    // // Sort through aux register and populate BMB struct cell temps
+    // for(int32_t j = 0; j < CELLS_PER_REG-1; j++)
+    // {
+    //     for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
+    //     {
+    //         // Extract 16bit ADC from register
+    //         uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
+    //         uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
+    //         uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
+
+    //         // Convert ADC to temp and populate bmb struct 
+    //         bmb[k].cellTemp[(muxState) + 2 * ((2 * CELLS_PER_REG) + j)] = lookup(CONVERT_16_BIT_ADC(rawAdc), &cellTempTable);
+    //         bmb[k].cellTempStatus[(muxState) + 2 * ((2 * CELLS_PER_REG) + j)] = GOOD;
+    //     }
+    // }
+
+    // // Extract final ADC value from register (board temp)
+    // for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
+    // {
+    //     // Extract 16bit ADC from register
+    //     uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (2 * CELL_REG_SIZE)];
+    //     uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (2 * CELL_REG_SIZE) + 1];
+    //     uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
+
+    //     // Convert ADC to temp and populate bmb struct
+    //     bmb[k].boardTemp = lookup(CONVERT_16_BIT_ADC(rawAdc), &boardTempTable);
+    //     bmb[k].boardTempStatus = GOOD;
+    // }
+
+    // Cycle mux state
+    // muxState++;
+    // muxState %= NUM_MUX_STATES;
+
+    // uint8_t data[6] = {0x01, 0x00, 0x00, 0xFF, 0x00, 0x00};
+    // data[4] = ((uint8_t)muxState << 1) | (0x01);
+    // msgStatus = writeAll(WR_CFG_REG_A, NUM_BMBS_IN_ACCUMULATOR, data);
+    // if((msgStatus != TRANSACTION_SUCCESS) && (msgStatus != TRANSACTION_CRC_ERROR) && (msgStatus != TRANSACTION_WRITE_REJECT) && (msgStatus != TRANSACTION_COMMAND_COUNTER_ERROR))
+    // {
+    //     return msgStatus;
+    // }
 
     // Start Aux ADC conversion
     msgStatus = commandAll(CMD_START_AUX_ADC, NUM_BMBS_IN_ACCUMULATOR);
@@ -447,170 +597,532 @@ static TRANSACTION_STATUS_E updateCellVoltages(Bmb_S* bmb)
     return msgStatus;
 }
 
-static TRANSACTION_STATUS_E updateCellDiagnostics(BmbTaskOutputData_S* bmbData)
+static void aggregateBmbData(Bmb_S* bmb)
 {
-    // SADC diagnostic state
-    static SADC_STATE_E sadcDiagnosticState = SADC_REDUNDANT;
+    // // Iterate through brick voltages
+	// for (int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+	// {
+	// 	Bmb_S* pBmb = &bmb[i];
+	// 	float maxCellVoltage = MIN_VOLTAGE_SENSOR_VALUE_V;
+	// 	float minCellVoltage = MAX_VOLTAGE_SENSOR_VALUE_V;
+	// 	float sumV	= 0.0f;
+	// 	uint32_t numGoodCellV = 0;
 
+	// 	float maxCellTemp = MIN_TEMP_SENSOR_VALUE_C;
+	// 	float minBrickTemp = MAX_TEMP_SENSOR_VALUE_C;
+	// 	float brickTempSum = 0.0f;
+	// 	uint32_t numGoodCellTemp = 0;
+
+	// 	float maxBoardTemp = MIN_TEMP_SENSOR_VALUE_C;
+	// 	float minBoardTemp = MAX_TEMP_SENSOR_VALUE_C;
+	// 	float boardTempSum = 0.0f;
+	// 	uint32_t numGoodBoardTemp = 0;
+
+	// 	// Aggregate brick voltage and temperature data
+	// 	for (int32_t j = 0; j < NUM_CELLS_PER_BMB; j++)
+	// 	{
+	// 		// Only update stats if sense status is good
+	// 		if (pBmb->cellVoltageStatus[j] == GOOD)
+	// 		{
+	// 			float brickV = pBmb->cellVoltage[j];
+
+	// 			if (brickV > maxCellVoltage)
+	// 			{
+	// 				maxCellVoltage = brickV;
+	// 			}
+	// 			if (brickV < minCellVoltage)
+	// 			{
+	// 				minCellVoltage = brickV;
+	// 			}
+	// 			numGoodCellV++;
+	// 			sumV += brickV;
+	// 		}
+
+	// 		// Only update stats if sense status is good
+	// 		if (pBmb->cellTempStatus[j] == GOOD)
+	// 		{
+	// 			float brickTemp = pBmb->cellTemp[j];
+
+	// 			if (brickTemp > maxCellTemp)
+	// 			{
+	// 				maxCellTemp = brickTemp;
+	// 			}
+	// 			if (brickTemp < minBrickTemp)
+	// 			{
+	// 				minBrickTemp = brickTemp;
+	// 			}
+	// 			numGoodCellTemp++;
+	// 			brickTempSum += brickTemp;
+	// 		}
+	// 	}
+
+	// 	// Aggregate board temp data
+	// // 	for (int32_t j = 0; j < NUM_BOARD_TEMP_PER_BMB; j++)
+	// // 	{
+	// // 		if (pBmb->boardTempStatus[j] == GOOD)
+	// // 		{
+	// // 			float boardTemp = pBmb->boardTemp[j];
+
+	// // 			if (boardTemp > maxBoardTemp)
+	// // 			{
+	// // 				maxBoardTemp = boardTemp;
+	// // 			}
+	// // 			if (boardTemp < minBoardTemp)
+	// // 			{
+	// // 				minBoardTemp = boardTemp;
+	// // 			}
+	// // 			numGoodBoardTemp++;
+	// // 			boardTempSum += boardTemp;
+	// // 		}
+	// // 	}
+
+	// 	// Update BMB statistics
+	// 	pBmb->maxCellVoltage = maxCellVoltage;
+	// 	pBmb->minCellVoltage = minCellVoltage;
+	// 	pBmb->sumCellVoltage = sumV;
+	// 	pBmb->avgCellVoltage = (numGoodCellV == 0) ? pBmb->avgCellVoltage : sumV / numGoodCellV;
+	// 	pBmb->numBadCellV = NUM_CELLS_PER_BMB - numGoodCellV;
+
+	// 	pBmb->maxCellTemp = maxCellTemp;
+	// 	pBmb->minCellTemp = minBrickTemp;
+	// 	pBmb->avgCellTemp = (numGoodCellTemp == 0) ? pBmb->avgCellTemp :  brickTempSum / numGoodCellTemp;
+	// 	pBmb->numBadCellTemp = NUM_CELLS_PER_BMB - numGoodCellTemp;
+
+	// // 	pBmb->maxBoardTemp = maxBoardTemp;
+	// // 	pBmb->minBoardTemp = minBoardTemp;
+	// // 	pBmb->avgBoardTemp = (numGoodBoardTemp == 0) ? pBmb->avgBoardTemp : boardTempSum / numGoodBoardTemp;
+	// // 	pBmb->numBadBoardTemp = NUM_BOARD_TEMP_PER_BMB - numGoodBoardTemp;
+	// }
+}
+
+static void aggregatePackData(BmbTaskOutputData_S* bmbData)
+{
+    // BmbTaskOutputData_S* pBms = bmbData;
+
+	// // Update BMB level stats
+	// aggregateBmbData(bmbData->bmb);
+
+	// float maxCellVoltage	   = MIN_BRICK_VOLTAGE_READING;
+	// float minCellVoltage	   = MAX_BRICK_VOLTAGE_READING;
+	// float avgCellVoltageSum = 0.0f;
+	// float accumulatorVSum = 0.0f;
+
+	// float maxCellVoltage    = MIN_TEMP_SENSE_READING;
+	// float minCellVoltage 	  = MAX_TEMP_SENSE_READING;
+	// float avgCellTempSum = 0.0f;
+
+	// float maxBoardTemp    = MIN_TEMP_SENSE_READING;
+	// float minBoardTemp 	  = MAX_TEMP_SENSE_READING;
+	// float avgBoardTempSum = 0.0f;
+
+	// for (int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+	// {
+	// 	Bmb_S* pBmb = &pBms->bmb[i];
+
+	// 	if (pBmb->maxCellVoltage > maxCellVoltage)
+	// 	{
+	// 		maxCellVoltage = pBmb->maxCellVoltage;
+	// 	}
+	// 	if (pBmb->minCellVoltage < minCellVoltage)
+	// 	{
+	// 		minCellVoltage = pBmb->minCellVoltage;
+	// 	}
+
+	// 	if (pBmb->maxCellVoltage > maxCellVoltage)
+	// 	{
+	// 		maxCellVoltage = pBmb->maxCellVoltage;
+	// 	}
+	// 	if (pBmb->minCellVoltage < minCellVoltage)
+	// 	{
+	// 		minCellVoltage = pBmb->minCellVoltage;
+	// 	}
+
+    //     avgCellVoltageSum += pBmb->avgCellVoltage;
+	// 	accumulatorVSum += pBmb->sumCellVoltage;
+	// 	avgCellTempSum += pBmb->avgCellTemp;
+
+    //     if(pBmb->boardTempStatus == GOOD)
+    //     {
+    //         if (pBmb->boardTemp > maxBoardTemp)
+    //         {
+    //             maxBoardTemp = pBmb->boardTemp;
+    //         }
+    //         if (pBmb->boardTemp < minBoardTemp)
+    //         {
+    //             minBoardTemp = pBmb->boardTemp;
+    //         }
+    //         avgBoardTempSum += pBmb->boardTemp;
+    //     }
+		
+	// }
+	// pBms->accumulatorVoltage = accumulatorVSum;
+	// pBms->maxCellVoltage = maxCellVoltage;
+	// pBms->minCellVoltage = minCellVoltage;
+	// pBms->avgBrickV = avgCellVoltageSum / NUM_BMBS_IN_ACCUMULATOR;
+	// pBms->maxCellVoltage = maxCellVoltage;
+	// pBms->minCellVoltage = minCellVoltage;
+	// pBms->avgBrickTemp = avgCellTempSum / NUM_BMBS_IN_ACCUMULATOR;
+	// pBms->maxBoardTemp = maxBoardTemp;
+	// pBms->minBoardTemp = minBoardTemp;
+	// pBms->avgBoardTemp = avgBoardTempSum / NUM_BMBS_IN_ACCUMULATOR;
+}
+
+
+static TRANSACTION_STATUS_E updateSADC(BmbTaskOutputData_S* bmbData)
+{
     TRANSACTION_STATUS_E msgStatus = TRANSACTION_SUCCESS;
 
-    bmbData->sadcState = sadcDiagnosticState;
-    if(sadcDiagnosticState < SADC_PAUSE_1)
-    {
-        uint8_t registerData[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
-        static uint16_t openWireMask = 0;
+    uint8_t registerData[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
 
-        // Update SADC cell voltages from SADC registers
-        for(int32_t i = 0; i < NUM_VOLT_REG-1; i++)
+    // Update SADC cell voltages from SADC registers
+    for(int32_t i = 0; i < NUM_VOLT_REG-1; i++)
+    {
+        memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+        msgStatus = readAll(readSadcVoltReg[i], NUM_BMBS_IN_ACCUMULATOR, registerData);
+        if(msgStatus != TRANSACTION_SUCCESS)
         {
-            memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
-            msgStatus = readAll(readSadcVoltReg[i], NUM_BMBS_IN_ACCUMULATOR, registerData);
+            return msgStatus;
+        }
+        for(int32_t j = 0; j < CELLS_PER_REG; j++)
+        {
+            for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
+            {
+                uint16_t cellIndex = (i * CELLS_PER_REG) + j;
+                uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
+                uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
+                uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
+                bmbData->bmb[k].cellVoltageRedundant[cellIndex] = CONVERT_16_BIT_ADC(rawAdc);
+                bmbData->bmb[k].cellVoltageRedundantStatus[cellIndex] = GOOD;
+            }
+        }
+    }
+
+    memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+    msgStatus = readAll(readSadcVoltReg[5], NUM_BMBS_IN_ACCUMULATOR, registerData);
+    if(msgStatus != TRANSACTION_SUCCESS)
+    {
+        return msgStatus;
+    }
+    for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
+    {
+        uint16_t cellIndex = 5 * CELLS_PER_REG;
+        uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES)];
+        uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + 1];
+        uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
+        bmbData->bmb[k].cellVoltageRedundant[cellIndex] = CONVERT_16_BIT_ADC(rawAdc);
+        bmbData->bmb[k].cellVoltageRedundantStatus[cellIndex] = GOOD;
+    }
+    return msgStatus;
+}
+
+static void checkAdcMismatch(BmbTaskOutputData_S* bmbData)
+{
+    if(bmbData->sPinState == SADC_REDUNDANT)
+    {
+        for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+        {
+            for(int32_t j = 0; j < NUM_CELLS_PER_BMB; j++)
+            {
+                if(fabs(bmbData->bmb[i].cellVoltage[j] - bmbData->bmb[i].cellVoltageRedundant[j]) > 0.2f)
+                {
+                    bmbData->bmb[i].adcMismatch[j] = true;
+                }
+                else
+                {
+                    bmbData->bmb[i].adcMismatch[j] = false;
+                }
+            }
+        }
+    }
+}
+
+static void checkOpenWire(BmbTaskOutputData_S* bmbData)
+{
+    if(bmbData->sPinState == SADC_OW_EVEN || bmbData->sPinState == SADC_OW_ODD)
+    {
+        uint32_t initIndex = 0;
+        if(bmbData->sPinState == SADC_OW_EVEN)
+        {
+            initIndex = 1;
+        }
+        for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+        {
+            for(int32_t j = initIndex; j < NUM_CELLS_PER_BMB; j+=2)
+            {
+                if(bmbData->bmb[i].cellVoltageRedundant[j] < 1.0f)
+                {
+                    bmbData->bmb[i].openAdcMask |= ((uint16_t)1<<j);
+                }
+                else
+                {
+                    bmbData->bmb[i].openAdcMask &= ~((uint16_t)1<<j);
+                }
+            }
+
+            for(int32_t j = 1; j < NUM_CELLS_PER_BMB; j++)
+            {
+                bmbData->bmb[i].openWire[j] = (((bmbData->bmb[i].openAdcMask >> (j-1)) & 0x0003) == 0x0003);
+            }  
+            bmbData->bmb[i].openWire[0] = (((bmbData->bmb[i].openAdcMask) & 0x0003) == 0x0001);
+            bmbData->bmb[i].openWire[NUM_CELLS_PER_BMB] = (((bmbData->bmb[i].openAdcMask) & 0xC000) == 0x8000); 
+        }
+    }
+}
+
+static TRANSACTION_STATUS_E updateBalanceSwitches(BmbTaskOutputData_S* bmbData)
+{
+    // // Determine minimum voltage across entire battery pack
+	// float bleedTargetVoltage = bmbData->minCellVoltage;
+
+	// // Ensure we don't overbleed the cells
+	// if (bleedTargetVoltage < MIN_BLEED_TARGET_VOLTAGE_V)
+	// {
+	// 	bleedTargetVoltage = MIN_BLEED_TARGET_VOLTAGE_V;
+	// }
+
+    // BmbTaskOutputData_S* pBms = bmbData;
+
+    // // Iterate through all BMBs and set bleed request
+	// for (int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+	// {
+    //     Bmb_S* pBmb = &pBms->bmb[i];
+	// 	// Iterate through all bricks and determine whether they should be bled or not
+	// 	for (int32_t j = 0; j < NUM_CELLS_PER_BMB; j++)
+	// 	{
+	// 		if (pBmb->cellVoltage[j] > bleedTargetVoltage + BALANCE_THRESHOLD_V)
+	// 		{
+	// 			pBmb->balSwRequested[j] = true;
+	// 		}
+	// 		else
+	// 		{
+	// 			pBmb->balSwRequested[j] = false;
+	// 		}
+	// 	}
+	// }
+
+    // // To determine cell balancing priority add all cells that need to be balanced to an array
+	// // Sort this array by cell voltage. We always want to balance the highest cell voltage. 
+	// // Iterate through the array starting with the highest voltage and enable balancing switch
+	// // if neighboring cells aren't being balanced. This is due to the circuit not allowing 
+	// // neighboring cells to be balanced. 
+	// for (int32_t bmbIdx = 0; bmbIdx < NUM_BMBS_IN_ACCUMULATOR; bmbIdx++)
+	// {
+    //     Bmb_S* pBmb = &pBms->bmb[bmbIdx];
+	// 	uint32_t numBricksNeedBalancing = 0;
+    //     Brick_S bricksToBalance[NUM_CELLS_PER_BMB];
+
+    //     for (int32_t brickIdx = 0; brickIdx < NUM_CELLS_PER_BMB; brickIdx++)
+    //     {
+    //         // Add brick to list of bricks that need balancing if balancing requested, brick
+    //         // isn't too hot, and the brick voltage is above the bleed threshold
+    //         if (pBmb->balSwRequested[brickIdx] &&
+    //             pBmb->cellTemp[brickIdx] < MAX_CELL_TEMP_BLEEDING_ALLOWED_C &&
+    //             pBmb->cellVoltage[brickIdx] > MIN_BLEED_TARGET_VOLTAGE_V)
+    //         {
+    //             // Brick needs to be balanced, add to array
+    //             bricksToBalance[numBricksNeedBalancing++] = (Brick_S) { .brickIdx = brickIdx, .brickV = pBmb->cellVoltage[brickIdx] };
+    //         }
+    //     }
+
+	// 	// Sort array of bricks that need balancing by their voltage
+	// 	insertionSort(bricksToBalance, numBricksNeedBalancing);
+	// 	// Clear all balance switches
+	// 	memset(pBmb->balSwEnabled, 0, NUM_CELLS_PER_BMB * sizeof(bool));
+
+	// 	for (int32_t i = numBricksNeedBalancing - 1; i >= 0; i--)
+	// 	{
+	// 		// For each brick that needs balancing ensure that the neighboring bricks aren't being bled
+	// 		Brick_S brick = bricksToBalance[i];
+	// 		int leftIdx = brick.brickIdx - 1;
+	// 		int rightIdx = brick.brickIdx + 1;
+	// 		bool leftNotBalancing = false;
+	// 		bool rightNotBalancing = false;
+	// 		if (leftIdx < 0)
+	// 		{
+	// 			leftNotBalancing = true;
+	// 		}
+	// 		else if (!pBmb->balSwEnabled[leftIdx])
+	// 		{
+	// 			leftNotBalancing = true;
+	// 		}
+
+	// 		if (rightIdx >= NUM_CELLS_PER_BMB)
+	// 		{
+	// 			rightNotBalancing = true;
+	// 		}
+	// 		else if (!pBmb->balSwEnabled[rightIdx])
+	// 		{
+	// 			rightNotBalancing = true;
+	// 		}
+
+	// 		if (leftNotBalancing && rightNotBalancing)
+	// 		{
+	// 			pBmb->balSwEnabled[brick.brickIdx] = true;
+	// 		}
+	// 	}
+    // }
+
+
+
+    // uint8_t registerDataPwmA[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
+    // memset(registerDataPwmA, 0xFF, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+
+    // uint8_t registerDataPwmB[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
+    // memset(registerDataPwmB, 0xFF, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+
+    // uint8_t mask = (bmbData->minCellLocation % 2) ? (0x0F) : (0xF0);
+    // if(bmbData->minCellLocation < 12)
+    // {
+    //     registerDataPwmA[(bmbData->minCellLocationBmb * REGISTER_SIZE_BYTES) + (bmbData->minCellLocation / 2)] = mask;
+    // }
+    // else
+    // {
+    //     registerDataPwmB[(bmbData->minCellLocationBmb * REGISTER_SIZE_BYTES) + ((bmbData->minCellLocation - 12) / 2)] = mask;
+    // }
+
+    // TRANSACTION_STATUS_E msgStatus;    
+
+    // return TRANSACTION_SUCCESS;
+    // msgStatus = writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerDataPwmA);
+    // if(msgStatus != TRANSACTION_SUCCESS)
+    // {
+    //     return msgStatus;
+    // }
+    // msgStatus = writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerDataPwmB);
+    // if(msgStatus != TRANSACTION_SUCCESS)
+    // {
+    //     return msgStatus;
+    // }
+    // return msgStatus;
+
+    return TRANSACTION_SUCCESS;
+}
+
+static TRANSACTION_STATUS_E runSwitchPinStateMachine(BmbTaskOutputData_S* bmbData, bool balancingEnabled)
+{
+    static uint32_t cycleCount = 0;
+    uint16_t startSadcMask = 0;
+    TRANSACTION_STATUS_E msgStatus;
+
+    if(bmbData->sPinState == SADC_REDUNDANT)
+    {
+        msgStatus = updateSADC(bmbData);
+        if(msgStatus != TRANSACTION_SUCCESS)
+        {
+            return msgStatus;
+        }
+        checkAdcMismatch(bmbData);
+        cycleCount++;
+        if(cycleCount >= 10)
+        {
+            cycleCount = 0;
+            startSadcMask = ADC_CONT | ADC_OW_EVEN;
+            bmbData->sPinState = SADC_OW_EVEN;
+        }
+        else
+        {
+            return TRANSACTION_SUCCESS;
+        }
+    }
+    else if(bmbData->sPinState == SADC_OW_EVEN)
+    {
+        msgStatus = updateSADC(bmbData);
+        if(msgStatus != TRANSACTION_SUCCESS)
+        {
+            return msgStatus;
+        }
+        checkOpenWire(bmbData);
+        cycleCount++;
+        if(cycleCount >= 10)
+        {
+            cycleCount = 0;
+            startSadcMask = ADC_CONT | ADC_OW_ODD;
+            bmbData->sPinState = SADC_OW_ODD;
+        }
+        else
+        {
+            return TRANSACTION_SUCCESS;
+        }
+    }
+    else if(bmbData->sPinState == SADC_OW_ODD)
+    {
+        msgStatus = updateSADC(bmbData);
+        if(msgStatus != TRANSACTION_SUCCESS)
+        {
+            return msgStatus;
+        }
+        checkOpenWire(bmbData);
+        cycleCount++;
+        if(cycleCount >= 10)
+        {
+            cycleCount = 0;
+            if(balancingEnabled)
+            {
+                msgStatus = updateBalanceSwitches(bmbData);
+                if(msgStatus != TRANSACTION_SUCCESS)
+                {
+                    return msgStatus;
+                }
+                msgStatus = commandAll(CMD_START_SADC, NUM_BMBS_IN_ACCUMULATOR);
+                if(msgStatus != TRANSACTION_SUCCESS)
+                {
+                    return msgStatus;
+                }
+            }
+            else
+            {
+                // Disable PWM regs here??
+                startSadcMask = ADC_CONT;
+            }  
+            bmbData->sPinState = SW_BALANCE;
+        }
+        else
+        {
+            return TRANSACTION_SUCCESS;
+        }
+        
+    }
+    else if(bmbData->sPinState == SW_BALANCE)
+    {
+        if(balancingEnabled)
+        {
+            msgStatus = updateBalanceSwitches(bmbData);
             if(msgStatus != TRANSACTION_SUCCESS)
             {
                 return msgStatus;
             }
-            for(int32_t j = 0; j < CELLS_PER_REG; j++)
+        }
+        else
+        {
+            msgStatus = updateSADC(bmbData);
+            if(msgStatus != TRANSACTION_SUCCESS)
             {
-                for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
-                {
-                    uint16_t cellIndex = (i * CELLS_PER_REG) + j;
-                    uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
-                    uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
-                    uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-                    bmbData->bmb[k].cellVoltageRedundant[cellIndex] = CONVERT_16_BIT_ADC(rawAdc);
-                    bmbData->bmb[k].cellVoltageRedundantStatus[cellIndex] = GOOD;
-
-                    if(sadcDiagnosticState == SADC_REDUNDANT)
-                    {
-                        if(fabs(bmbData->bmb[k].cellVoltage[cellIndex] - bmbData->bmb[k].cellVoltageRedundant[cellIndex]) > 0.2f)
-                        {
-                            bmbData->bmb[k].adcMismatch[cellIndex] = true;
-                        }
-                        else
-                        {
-                            bmbData->bmb[k].adcMismatch[cellIndex] = false;
-                        }
-                    }
-                    else if((sadcDiagnosticState == SADC_OW_EVEN) && (bool)(cellIndex % 2))
-                    {
-                        if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.1f)
-                        {
-                            openWireMask |= ((uint16_t)1<<cellIndex);
-                        }
-                        else
-                        {
-                            openWireMask &= ~((uint16_t)1<<cellIndex);
-                        }
-                    }
-                    else if((sadcDiagnosticState == SADC_OW_ODD) && !(bool)(cellIndex % 2))
-                    {
-                        if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.1f)
-                        {
-                            openWireMask |= ((uint16_t)1<<cellIndex);
-                        }
-                        else
-                        {
-                            openWireMask &= ~((uint16_t)1<<cellIndex);
-                        }
-                    }
-                }
+                return msgStatus;
             }
+            checkAdcMismatch(bmbData);
         }
 
-        memset(registerData, 0, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
-        msgStatus = readAll(readSadcVoltReg[5], NUM_BMBS_IN_ACCUMULATOR, registerData);
-        if(msgStatus != TRANSACTION_SUCCESS)
+        cycleCount++;
+        if(cycleCount >= 85)
         {
-            return msgStatus;
+            cycleCount = 0;
+            startSadcMask = ADC_CONT;
+            bmbData->sPinState = SADC_REDUNDANT;
         }
-        for(int32_t k = 0; k < NUM_BMBS_IN_ACCUMULATOR; k++)
+        else
         {
-            uint16_t cellIndex = 5 * CELLS_PER_REG;
-            uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES)];
-            uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + 1];
-            uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-            bmbData->bmb[k].cellVoltageRedundant[cellIndex] = CONVERT_16_BIT_ADC(rawAdc);
-            bmbData->bmb[k].cellVoltageRedundantStatus[cellIndex] = GOOD;
-
-            if(sadcDiagnosticState == SADC_REDUNDANT)
-            {
-                if(fabs(bmbData->bmb[k].cellVoltage[cellIndex] - bmbData->bmb[k].cellVoltageRedundant[cellIndex]) > 0.2f)
-                {
-                    bmbData->bmb[k].adcMismatch[cellIndex] = true;
-                }
-                else
-                {
-                    bmbData->bmb[k].adcMismatch[cellIndex] = false;
-                }
-            }
-            else if((sadcDiagnosticState == SADC_OW_EVEN) && (bool)(cellIndex % 2))
-            {
-                if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.1f)
-                {
-                    openWireMask |= ((uint16_t)1<<cellIndex);
-                }
-                else
-                {
-                    openWireMask &= ~((uint16_t)1<<cellIndex);
-                }
-            }
-            else if((sadcDiagnosticState == SADC_OW_ODD) && !(bool)(cellIndex % 2))
-            {
-                if(bmbData->bmb[k].cellVoltageRedundant[cellIndex] < 0.1f)
-                {
-                    openWireMask |= ((uint16_t)1<<cellIndex);
-                }
-                else
-                {
-                    openWireMask &= ~((uint16_t)1<<cellIndex);
-                }
-            }
-        }
-
-        //Check for Open wires
-        if((sadcDiagnosticState == SADC_OW_EVEN) || (sadcDiagnosticState == SADC_OW_ODD))
-        {
-            for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
-            {
-                for(int32_t j = 1; j < NUM_CELLS_PER_BMB; j++)
-                {
-                    bmbData->bmb[i].openWire[j] = (((openWireMask >> (j-1)) & 0x0003) == 0x0003);
-                }  
-                bmbData->bmb[i].openWire[0] = (((openWireMask) & 0x0003) == 0x0001);
-                bmbData->bmb[i].openWire[NUM_CELLS_PER_BMB] = (((openWireMask) & 0xC000) == 0x8000); 
-            }
+            return TRANSACTION_SUCCESS;
         }
     }
-
-    // Cycle SADC diagnostic state
-    sadcDiagnosticState++;
-    sadcDiagnosticState %= NUM_SADC_STATES;
-
-    if(sadcDiagnosticState == SADC_REDUNDANT)
+    else
     {
-        msgStatus = commandAll(CMD_START_SADC | ADC_CONT, NUM_BMBS_IN_ACCUMULATOR);
-        if(msgStatus != TRANSACTION_SUCCESS)
-        {
-            return msgStatus;
-        }
+        cycleCount = 0;
+        startSadcMask = ADC_CONT;
+        bmbData->sPinState = SADC_REDUNDANT;
     }
-    else if(sadcDiagnosticState == SADC_OW_EVEN)
-    {
-        msgStatus = commandAll(CMD_START_SADC | ADC_CONT | ADC_OW_EVEN, NUM_BMBS_IN_ACCUMULATOR);
-        if(msgStatus != TRANSACTION_SUCCESS)
-        {
-            return msgStatus;
-        }
-    }
-    else if(sadcDiagnosticState == SADC_OW_ODD)
-    {
-        msgStatus = commandAll(CMD_START_SADC | ADC_CONT | ADC_OW_ODD, NUM_BMBS_IN_ACCUMULATOR);
-        if(msgStatus != TRANSACTION_SUCCESS)
-        {
-            return msgStatus;
-        }
-    }
-    return msgStatus;
+
+    // Update SADC
+    return commandAll(CMD_START_SADC | startSadcMask, NUM_BMBS_IN_ACCUMULATOR);
 }
 
 static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb)
@@ -632,22 +1144,22 @@ static TRANSACTION_STATUS_E updateTestData(Bmb_S* bmb)
     return TRANSACTION_SUCCESS;
 }
 
-static TRANSACTION_STATUS_E balanceAll(Bmb_S* bmb)
-{
-    uint8_t registerData[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
-    memset(registerData, 0x00, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
-    registerData[4] = 0xFF;
-    registerData[5] = 0xFF;
+// static TRANSACTION_STATUS_E balanceAll(Bmb_S* bmb)
+// {
+//     uint8_t registerData[REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR];
+//     memset(registerData, 0x00, REGISTER_SIZE_BYTES * NUM_BMBS_IN_ACCUMULATOR);
+//     registerData[4] = 0xFF;
+//     registerData[5] = 0xFF;
 
-    for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
-    {
-        // writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
-        // writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerData);
-        writeAll(0x0024, NUM_BMBS_IN_ACCUMULATOR, registerData);
+//     for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+//     {
+//         // writeAll(WR_PWM_A, NUM_BMBS_IN_ACCUMULATOR, registerData);
+//         // writeAll(WR_PWM_B, NUM_BMBS_IN_ACCUMULATOR, registerData);
+//         writeAll(0x0024, NUM_BMBS_IN_ACCUMULATOR, registerData);
 
-    }
-    return TRANSACTION_SUCCESS;
-}
+//     }
+//     return TRANSACTION_SUCCESS;
+// }
 
 /* ==================================================================== */
 /* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
@@ -684,7 +1196,7 @@ void runBmbUpdateTask()
     status = updateCellVoltages(bmbTaskOutputDataLocal.bmb);
     HANDLE_BMB_ERROR(status);
 
-    status = updateCellDiagnostics(&bmbTaskOutputDataLocal);
+    status = updateSADC(&bmbTaskOutputDataLocal);
     HANDLE_BMB_ERROR(status);
 
     status = updateCellTemps(bmbTaskOutputDataLocal.bmb);
@@ -693,8 +1205,8 @@ void runBmbUpdateTask()
     status = updateTestData(bmbTaskOutputDataLocal.bmb);
     HANDLE_BMB_ERROR(status);
 
-    // status = balanceAll(bmbTaskOutputDataLocal.bmb);
-    // HANDLE_BMB_ERROR(status);  
+    status = runSwitchPinStateMachine(&bmbTaskOutputDataLocal, false);
+    HANDLE_BMB_ERROR(status);    
 
     taskENTER_CRITICAL();
     bmbTaskOutputData = bmbTaskOutputDataLocal;

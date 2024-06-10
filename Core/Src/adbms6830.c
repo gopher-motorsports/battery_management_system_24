@@ -8,6 +8,7 @@
 #include "stm32f4xx_hal.h"
 #include "adbms6830.h"
 #include "spi.h"
+#include "debug.h"
 
 /* ==================================================================== */
 /* ============================= DEFINES ============================== */
@@ -34,7 +35,7 @@
 #define TRANSACTION_ATTEMPTS    3
 #define SPI_TIMEOUT_MS          10
 
-#define DUAL_TRANSACTIONS_BEFORE_RETRY  1000
+#define DUAL_TRANSACTIONS_BEFORE_RETRY  5000
 
 #define RESET_COMMAND_COUNTER_ADDRESS   0x002E
 #define READ_SERIAL_ID_COMMAND          0x002C
@@ -531,6 +532,8 @@ static TRANSACTION_STATUS_E sendMessageBmbChain(transactionPtr transaction, uint
             // If there are any chain breaks, use both ports to reach as many bmbs as possible
             TRANSACTION_STATUS_E portAStatus = (chainInfo.availableBmbs[PORTA] > 0) ? (transaction(command, chainInfo.availableBmbs[PORTA], dataBuffer, PORTA)) : (TRANSACTION_SUCCESS);
             TRANSACTION_STATUS_E portBStatus = (chainInfo.availableBmbs[PORTB] > 0) ? (transaction(command, chainInfo.availableBmbs[PORTB], dataBuffer, PORTB)) : (TRANSACTION_SUCCESS); 
+            // Debug("\nPortAStatus: %lu\n", (uint32_t)portAStatus);
+            // Debug("PortBStatus: %lu\n", (uint32_t)portBStatus);
 
             if((portAStatus == TRANSACTION_SUCCESS) && (portBStatus == TRANSACTION_SUCCESS))
             {
@@ -543,6 +546,8 @@ static TRANSACTION_STATUS_E sendMessageBmbChain(transactionPtr transaction, uint
                         TRANSACTION_STATUS_E countStatus = enumerateBmbs(numBmbs);
                         if(countStatus != TRANSACTION_SUCCESS)
                         {
+                            // Debug("Why am I here?!");
+                            vTaskDelay(1);
                             return countStatus;
                         }
                     }
@@ -637,13 +642,18 @@ void wakeChain(uint32_t numBmbs)
 {
     static PORT_E wakeOriginPort = PORTA;
 
+    uint32_t packetLength = numBmbs * 100;
+    uint8_t txBuffer[packetLength];
+    uint8_t rxBuffer[packetLength];
+
     // Attempt to wake up all avalable bmbs on the wake origin port
     for(int32_t i = 0; i < (chainInfo.availableBmbs[wakeOriginPort] + 2); i++)
     {
         //TODO May need to set this in init function
         openPort(wakeOriginPort);
         closePort(wakeOriginPort);
-        vTaskDelay(1 * portTICK_PERIOD_MS);
+        SPI_TRANSMIT(HAL_SPI_TransmitReceive_IT, &hspi1, SPI_TIMEOUT_MS, txBuffer, rxBuffer, packetLength);
+        // vTaskDelay(1 * portTICK_PERIOD_MS);
     }
 
     // Swap the wake origin port
@@ -656,7 +666,8 @@ void wakeChain(uint32_t numBmbs)
         {
             openPort(wakeOriginPort);
             closePort(wakeOriginPort);
-            vTaskDelay(1 * portTICK_PERIOD_MS);
+            SPI_TRANSMIT(HAL_SPI_TransmitReceive_IT, &hspi1, SPI_TIMEOUT_MS, txBuffer, rxBuffer, packetLength);
+            // vTaskDelay(1 * portTICK_PERIOD_MS);
         }
     }
 }

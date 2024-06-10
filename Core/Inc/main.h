@@ -33,6 +33,9 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 #include "bmbUpdateTask.h"
 
+#define BMB_UPDATE_TASK_PERIOD_MS   20
+#define PRINT_TASK_PERIOD_MS        1000
+
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
