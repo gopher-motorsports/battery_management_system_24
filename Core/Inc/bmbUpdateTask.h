@@ -12,7 +12,7 @@
 /* ============================= DEFINES ============================== */
 /* ==================================================================== */
 
-#define NUM_BMBS_IN_ACCUMULATOR     2
+#define NUM_BMBS_IN_ACCUMULATOR     1
 #define NUM_CELLS_PER_BMB           16
 
 /* ==================================================================== */
@@ -56,8 +56,8 @@ typedef struct
     SENSOR_STATUS_E cellVoltageRedundantStatus[NUM_CELLS_PER_BMB];
     float cellVoltageRedundant[NUM_CELLS_PER_BMB];
     bool adcMismatch[NUM_CELLS_PER_BMB];
-    uint16_t openAdcMask;
-    bool openWire[NUM_CELLS_PER_BMB+1];
+    // uint16_t openAdcMask;
+    bool openWire[NUM_CELLS_PER_BMB];
 
     SENSOR_STATUS_E cellTempStatus[NUM_CELLS_PER_BMB];
     float cellTemp[NUM_CELLS_PER_BMB];
@@ -68,16 +68,16 @@ typedef struct
     SENSOR_STATUS_E dieTempStatus;
     float dieTemp;
 
-    float maxCellVoltage;
-    float minCellVoltage;
-    float sumCellVoltage;
-    float avgCellVoltage;
-    uint32_t numBadCellV;
+    float maxBrickVoltage;
+    float minBrickVoltage;
+    float sumBrickVoltage;
+    float avgBrickVoltage;
+    uint32_t numBadBrickV;
 
-    float maxCellTemp;
-    float minCellTemp;
-    float avgCellTemp;
-    uint32_t numBadCellTemp;
+    float maxBrickTemp;
+    float minBrickTemp;
+    float avgBrickTemp;
+    uint32_t numBadBrickTemp;
 
     // Balancing Configuration
 	bool balSwRequested[NUM_CELLS_PER_BMB];	// Set by BMS to determine which cells need to be balanced

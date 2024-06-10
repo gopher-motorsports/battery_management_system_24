@@ -41,46 +41,56 @@ static void printCellVoltages(Bmb_S* bmb)
         printf("    %02ld     |", i);
     }
     printf("\n");
-    printf("|    00    |");
-    for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
-    {
-        if(bmb[i].openWire[0])
-        {
-            printf(" OPEN WIRE |");
-        }
-        else
-        {
-            printf("           |");
-        }
-    }
-    printf("\n");
+    // printf("|    00    |");
+    // for(int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
+    // {
+    //     if(bmb[i].openWire[0])
+    //     {
+    //         printf(" OPEN WIRE |");
+    //     }
+    //     else
+    //     {
+    //         printf("           |");
+    //     }
+    // }
+    // printf("\n");
 
     for(int32_t i = 0; i < NUM_CELLS_PER_BMB; i++)
     {
         printf("|    %02ld    |", i+1);
         for(int32_t j = 0; j < NUM_BMBS_IN_ACCUMULATOR; j++)
         {
-            if(bmb[j].cellVoltageStatus[i] == GOOD)
+            if(bmb[j].openWire[i])
             {
-                if(bmb[j].openWire[i+1])
-                {
-                    printf(" OPEN WIRE |");
-                }
-                else
-                {
-                    if((bmb[j].cellVoltage[i] < 0.0f) || bmb[j].cellVoltage[i] >= 100.0f)
-                    {
-                        printf("  %5.3f   |", (double)bmb[j].cellVoltage[i]);
-                    }
-                    else
-                    {
-                        printf("   %5.3f   |", (double)bmb[j].cellVoltage[i]);
-                    }
-                }
+                printf(" OPEN WIRE |");
             }
             else
             {
-                printf(" NO SIGNAL |");
+                if(bmb[j].cellVoltageStatus[i] == GOOD)
+                {
+
+                    if(bmb[j].balSwEnabled[i])
+                    {
+                        printf("*");
+                    }
+                    else
+                    {
+                        printf(" ");
+                    }
+
+                    if((bmb[j].cellVoltage[i] < 0.0f) || bmb[j].cellVoltage[i] >= 100.0f)
+                    {
+                        printf(" %5.3f   |", (double)bmb[j].cellVoltage[i]);
+                    }
+                    else
+                    {
+                        printf("  %5.3f   |", (double)bmb[j].cellVoltage[i]);
+                    }
+                }
+                else
+                {
+                    printf(" NO SIGNAL |");
+                }
             }
         }
         printf("\n");
@@ -195,7 +205,7 @@ static void printCellTemps(Bmb_S* bmb)
     printf("\n");
     for(int32_t i = 0; i < NUM_CELLS_PER_BMB; i++)
     {
-        printf("|    %02ld   |", i);
+        printf("|    %02ld   |", i+1);
         for(int32_t j = 0; j < NUM_BMBS_IN_ACCUMULATOR; j++)
         {
             if(bmb[j].cellTempStatus[i] == GOOD)

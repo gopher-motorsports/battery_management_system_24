@@ -5,6 +5,7 @@
 #include "lookupTable.h"
 #include <stdbool.h>
 #include <math.h>
+#include "utils.h"
 
 
 /* ==================================================================== */
@@ -13,9 +14,6 @@
 
 // The max number of calls that are allowed in a binary search instance before erroring
 #define MAX_DEPTH 20
-
-#define EPSILON 1e-4f
-#define fequals(a, b) (fabsf(a - b) < EPSILON) ? (true) : (false)
 
 
 /* ==================================================================== */
