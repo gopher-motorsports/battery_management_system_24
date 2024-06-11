@@ -42,8 +42,8 @@ void runChargerTask()
     //     printf("YAY\n");
     // }
     
-    update_and_queue_param_float(&chargerVoltageRequest_V, 32.0f);
-    service_can_tx(&hcan1);
+    // update_and_queue_param_float(&chargerVoltageRequest_V, 32.0f);
+    // service_can_tx(&hcan1);
 
     // if(chargerConnected)
     // {

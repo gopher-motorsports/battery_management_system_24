@@ -64,10 +64,10 @@ TIM_HandleTypeDef htim4;
 UART_HandleTypeDef huart1;
 
 osThreadId bmbUpdateTaskHandle;
-uint32_t bmbUpdateTaskBuffer[ 2048 ];
+uint32_t bmbUpdateTaskBuffer[ 4096 ];
 osStaticThreadDef_t bmbUpdateTaskControlBlock;
 osThreadId printTaskHandle;
-uint32_t printTaskBuffer[ 2048 ];
+uint32_t printTaskBuffer[ 4096 ];
 osStaticThreadDef_t printTaskControlBlock;
 osThreadId lowPriTaskHandle;
 uint32_t lowPriTaskBuffer[ 512 ];
@@ -252,9 +252,9 @@ int main(void)
   MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
   
-  init_can(&hcan1, GCAN0);
-  // init_can(&hcan2, GCAN0);
-  gsense_init(&hcan1, &hadc1, 0, 0, MCU_GSENSE_GPIO_Port, MCU_GSENSE_Pin);
+  // init_can(&hcan1, GCAN0);
+  // // init_can(&hcan2, GCAN0);
+  // gsense_init(&hcan1, &hadc1, 0, 0, MCU_GSENSE_GPIO_Port, MCU_GSENSE_Pin);
 
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2);
 
@@ -282,11 +282,11 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of bmbUpdateTask */
-  osThreadStaticDef(bmbUpdateTask, StartBmbUpdateTask, osPriorityNormal, 0, 2048, bmbUpdateTaskBuffer, &bmbUpdateTaskControlBlock);
+  osThreadStaticDef(bmbUpdateTask, StartBmbUpdateTask, osPriorityNormal, 0, 4096, bmbUpdateTaskBuffer, &bmbUpdateTaskControlBlock);
   bmbUpdateTaskHandle = osThreadCreate(osThread(bmbUpdateTask), NULL);
 
   /* definition and creation of printTask */
-  osThreadStaticDef(printTask, StartPrintTask, osPriorityBelowNormal, 0, 2048, printTaskBuffer, &printTaskControlBlock);
+  osThreadStaticDef(printTask, StartPrintTask, osPriorityBelowNormal, 0, 4096, printTaskBuffer, &printTaskControlBlock);
   printTaskHandle = osThreadCreate(osThread(printTask), NULL);
 
   /* definition and creation of lowPriTask */
@@ -834,13 +834,13 @@ void StartBmbUpdateTask(void const * argument)
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   initBmbUpdateTask();
-  // TickType_t lastBmbUpdateTaskTick = HAL_GetTick();
+  TickType_t lastBmbUpdateTaskTick = HAL_GetTick();
   const TickType_t bmbUpdateTaskPeriod = pdMS_TO_TICKS(BMB_UPDATE_TASK_PERIOD_MS);
   for(;;)
   {
-    osDelay(1000);
-    // runBmbUpdateTask();
-    // vTaskDelayUntil(&lastBmbUpdateTaskTick, bmbUpdateTaskPeriod);
+    // osDelay(1000);
+    runBmbUpdateTask();
+    vTaskDelayUntil(&lastBmbUpdateTaskTick, bmbUpdateTaskPeriod);
   }
   /* USER CODE END 5 */
 }
@@ -942,7 +942,7 @@ void runServiceGopherCan(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-    service_can_rx_buffer();
+    // service_can_rx_buffer();
     osDelay(1);
   }
   /* USER CODE END runServiceGopherCan */
