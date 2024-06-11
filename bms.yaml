@@ -75,21 +75,6 @@ buckets:
                 sensor: NON_ADC
                 samples_buffered: 1
 
-            chargerVoltageRequest_V:
-                ADC: NON_ADC
-                sensor: NON_ADC
-                samples_buffered: 1
-
-            chargerCurrentRequest_A:
-                ADC: NON_ADC
-                sensor: NON_ADC
-                samples_buffered: 1
-
-            chargerControl:
-                ADC: NON_ADC
-                sensor: NON_ADC
-                samples_buffered: 1
-
     low_frequency_bms:
         frequency_hz: 4
         parameters:

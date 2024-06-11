@@ -73,32 +73,32 @@ void sendChargerMessage(float voltageRequest, float currentRequest, bool enable)
     }
 }
 
-/*!
-  @brief   Update the bms struct with charger information
-  @param   bms - BMS data struct
-*/
-void updateChargerData(Charger_Data_S* chargerData)
-{
-    // Decode charger CAN message into output voltage and current 
-    // [0] Voltage*10 HIGH Byte
-    // [1] Voltage*10 LOW Byte
-    // [2] Current*10 HIGH Byte
-    // [3] Current*10 LOW Byte
-    // [4] Status Byte
-    portENTER_CRITICAL(); // Enter critical state while reading volatile CAN data
-    uint16_t deciVolts = (uint16_t)chargerMessage[0] << 8 | (uint16_t)chargerMessage[1];
-    uint16_t deciAmps = (uint16_t)chargerMessage[2] << 8 | (uint16_t)chargerMessage[3];
-    uint8_t statusByte = chargerMessage[4];
-    portEXIT_CRITICAL();
+// /*!
+//   @brief   Update the bms struct with charger information
+//   @param   bms - BMS data struct
+// */
+// void updateChargerData(Charger_Data_S* chargerData)
+// {
+//     // Decode charger CAN message into output voltage and current 
+//     // [0] Voltage*10 HIGH Byte
+//     // [1] Voltage*10 LOW Byte
+//     // [2] Current*10 HIGH Byte
+//     // [3] Current*10 LOW Byte
+//     // [4] Status Byte
+//     portENTER_CRITICAL(); // Enter critical state while reading volatile CAN data
+//     uint16_t deciVolts = (uint16_t)chargerMessage[0] << 8 | (uint16_t)chargerMessage[1];
+//     uint16_t deciAmps = (uint16_t)chargerMessage[2] << 8 | (uint16_t)chargerMessage[3];
+//     uint8_t statusByte = chargerMessage[4];
+//     portEXIT_CRITICAL();
 
-    // Convert from decivolts/deciamps to volts/amps
-    chargerData->chargerVoltage = (float)deciVolts / 10.0f;
-    chargerData->chargerCurrent = (float)deciAmps / 10.0f;
+//     // Convert from decivolts/deciamps to volts/amps
+//     chargerData->chargerVoltage = (float)deciVolts / 10.0f;
+//     chargerData->chargerCurrent = (float)deciAmps / 10.0f;
 
-    // Shift through the charger status byte and check for charger errors
-    uint8_t mask = 0x01;
-    for (int32_t i = 0; i < NUM_CHARGER_FAULTS; i++)
-    {
-        chargerData->chargerStatus[i] = ((statusByte & (mask << i)) == mask);
-    }
-}
+//     // Shift through the charger status byte and check for charger errors
+//     uint8_t mask = 0x01;
+//     for (int32_t i = 0; i < NUM_CHARGER_FAULTS; i++)
+//     {
+//         chargerData->chargerStatus[i] = ((statusByte & (mask << i)) == mask);
+//     }
+// }

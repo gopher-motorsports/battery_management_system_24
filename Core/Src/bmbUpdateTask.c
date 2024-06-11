@@ -1384,7 +1384,7 @@ void runBmbUpdateTask()
     status = updateTestData(bmbTaskOutputDataLocal.bmb);
     HANDLE_BMB_ERROR(status);
 
-    status = runSwitchPinStateMachine(&bmbTaskOutputDataLocal, true);
+    status = runSwitchPinStateMachine(&bmbTaskOutputDataLocal, chargerConnected);
     HANDLE_BMB_ERROR(status);    
 
     runBmbAlertMonitor(&bmbTaskOutputData);

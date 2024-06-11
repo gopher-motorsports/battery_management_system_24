@@ -252,9 +252,9 @@ int main(void)
   MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
   
-  // init_can(&hcan1, GCAN0);
-  // // init_can(&hcan2, GCAN0);
-  // gsense_init(&hcan1, &hadc1, 0, 0, MCU_GSENSE_GPIO_Port, MCU_GSENSE_Pin);
+  init_can(&hcan1, GCAN0);
+  init_can(&hcan2, GCAN0);
+  gsense_init(&hcan2, &hadc1, 0, 0, MCU_GSENSE_GPIO_Port, MCU_GSENSE_Pin);
 
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2);
 
@@ -942,7 +942,7 @@ void runServiceGopherCan(void const * argument)
   /* Infinite loop */
   for(;;)
   {
-    // service_can_rx_buffer();
+    service_can_rx_buffer();
     osDelay(1);
   }
   /* USER CODE END runServiceGopherCan */

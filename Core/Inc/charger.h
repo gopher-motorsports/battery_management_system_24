@@ -14,7 +14,7 @@
 
 // Charger TX CAN EXT ID, Charger RX EXT ID is CHARGER_CAN_ID + 1
 #define CHARGER_CAN_ID_TX                   0x1806E5F4
-#define CHARGER_CAN_ID_RX                   0x18FF50E5
+// #define CHARGER_CAN_ID_RX                   0x18FF50E5
 
 // The delay between consecutive charger request CAN messages
 // The ELCON charger expects a message every 1s and will fault if a message is not recieve in 5s
@@ -105,6 +105,6 @@ void sendChargerMessage(float voltageRequest, float currentRequest, bool enable)
   @brief   Update a chargerData struct with charger information
   @param   chargerData - Charger_Data_S data struct to store charger data
 */
-void updateChargerData(Charger_Data_S* chargerData);
+// void updateChargerData(Charger_Data_S* chargerData);
 
 #endif /* CHARGER_H_ */
