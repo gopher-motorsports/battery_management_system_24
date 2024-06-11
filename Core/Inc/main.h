@@ -34,10 +34,12 @@ extern "C" {
 #include "bmbUpdateTask.h"
 #include "charger.h"
 #include "alerts.h"
+#include "currentSenseTask.h"
 
-#define BMB_UPDATE_TASK_PERIOD_MS   200
-#define PRINT_TASK_PERIOD_MS        1000
-#define CHARGER_TASK_PERIOD_MS      100
+#define BMB_UPDATE_TASK_PERIOD_MS     200
+#define PRINT_TASK_PERIOD_MS          1000
+#define CHARGER_TASK_PERIOD_MS        100
+#define CURRENT_SENSE_TASK_PERIOD_MS  10
 
 /* USER CODE END Includes */
 
@@ -70,6 +72,8 @@ void Error_Handler(void);
 #define AMS_FAULT_SDC_GPIO_Port GPIOC
 #define BSPD_FAULT_SDC_Pin GPIO_PIN_15
 #define BSPD_FAULT_SDC_GPIO_Port GPIOC
+#define MCU_GSENSE_Pin GPIO_PIN_0
+#define MCU_GSENSE_GPIO_Port GPIOC
 #define MCU_FAULT_Pin GPIO_PIN_1
 #define MCU_FAULT_GPIO_Port GPIOC
 #define MCU_HEARTBEAT_Pin GPIO_PIN_2
@@ -95,6 +99,7 @@ void Error_Handler(void);
 
 extern BmbTaskOutputData_S bmbTaskOutputData;
 extern Charger_Data_S chargerTaskOutputData;
+extern CurrentSenseTaskOutputData_S currentSenseOutputData;
 
 /* USER CODE END Private defines */
 

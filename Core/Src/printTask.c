@@ -6,6 +6,7 @@
 #include "printTask.h"
 #include "main.h"
 #include "bmbUpdateTask.h"
+#include "currentSenseTask.h"
 #include "cmsis_os.h"
 #include "alerts.h"
 
@@ -16,6 +17,7 @@
 typedef struct
 {
     BmbTaskOutputData_S bmbTaskData;
+    CurrentSenseTaskOutputData_S currentSenseData;
 } PrintTaskInputData_S;
 
 /* ==================================================================== */
@@ -26,6 +28,7 @@ static void printCellVoltages(Bmb_S* bmb);
 static void printCellTemps(Bmb_S* bmb);
 static void printTestData(Bmb_S* bmb);
 static void printActiveAlerts();
+void printSocAndSoe(CurrentSenseTaskOutputData_S currentSenseData);
 // static void printTempTest(Bmb_S* bmb);
 
 /* ==================================================================== */
@@ -325,6 +328,14 @@ static void printActiveAlerts()
 	printf("\n");
 }
 
+void printSocAndSoe(CurrentSenseTaskOutputData_S currentSenseData)
+{
+	printf("| METHOD |    SOC   |    SOE   |\n");
+	printf("|  OCV   |  %5.2f%%  |  %5.2f%%  |\n", (double)(100.0f * currentSenseData.soc.socByOcv), (double)(100.0f * currentSenseData.soc.soeByOcv));
+	printf("|  CC    |  %5.2f%%  |  %5.2f%%  |\n", (double)(100.0f * currentSenseData.soc.socByCoulombCounting), (double)(100.0f * currentSenseData.soc.soeByCoulombCounting));
+	printf("Remaining SOC by OCV qualification time ms: %lu\n", getTimeTilExpirationMs(&currentSenseData.soc.socByOcvGoodTimer));
+}
+
 /* ==================================================================== */
 /* =================== GLOBAL FUNCTION DEFINITIONS ==================== */
 /* ==================================================================== */
@@ -339,13 +350,19 @@ void runPrintTask()
     PrintTaskInputData_S printTaskInputData;
     taskENTER_CRITICAL();
     printTaskInputData.bmbTaskData = bmbTaskOutputData;
+    printTaskInputData.currentSenseData = currentSenseOutputData;
     taskEXIT_CRITICAL();
 
     printf("\e[1;1H\e[2J");
     printCellVoltages(printTaskInputData.bmbTaskData.bmb);
     printCellTemps(printTaskInputData.bmbTaskData.bmb);
 
+    printf("\n");
     printf("Min Cell V: %f\n", printTaskInputData.bmbTaskData.minCellVoltage);
+    printf("Tractive Current: %6.3f\n", printTaskInputData.currentSenseData.tractiveSystemCurrent);
+    printSocAndSoe(printTaskInputData.currentSenseData);
+    printf("\n");
+
     // printTestData(printTaskInputData.bmbTaskData.bmb);
     printActiveAlerts();
 }

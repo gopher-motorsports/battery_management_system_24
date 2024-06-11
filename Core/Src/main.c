@@ -28,7 +28,8 @@
 #include "spi.h"
 #include <stdint.h>
 #include <stdio.h>
-// #include "GopherCAN.h"
+#include "GopherCAN.h"
+#include "gopher_sense.h"
 
 /* USER CODE END Includes */
 
@@ -77,10 +78,15 @@ osStaticThreadDef_t chargerTaskControlBlock;
 osThreadId idleTaskHandle;
 uint32_t idleTaskBuffer[ 128 ];
 osStaticThreadDef_t idleTaskControlBlock;
+osThreadId serviceGCANHandle;
+osThreadId currentSenseTasHandle;
+uint32_t currentSenseTasBuffer[ 512 ];
+osStaticThreadDef_t currentSenseTasControlBlock;
 /* USER CODE BEGIN PV */
 
 BmbTaskOutputData_S bmbTaskOutputData;
 Charger_Data_S chargerTaskOutputData;
+CurrentSenseTaskOutputData_S currentSenseOutputData;
 
 volatile bool EVSEConnected = false;
 volatile uint32_t EVSELastUpdate = 0;
@@ -107,6 +113,8 @@ void StartPrintTask(void const * argument);
 void StartLowPriTask(void const * argument);
 void StartChargerTask(void const * argument);
 void StartIdleTask(void const * argument);
+void runServiceGopherCan(void const * argument);
+void StartCurrentSenseTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
 #ifdef __GNUC__
@@ -172,58 +180,8 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
   {
     EVSEConnected = true;
     EVSELastUpdate = HAL_GetTick();
-    __HAL_TIM_SET_COUNTER(htim, 0);
-    
-    // static bool firstCapture = true;
-    // static uint32_t icVal1 = 0;
-    // if(!firstCapture)
-    // {
-    //   icVal1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
-    //   firstCapture = false;
-    // }
-    // else
-    // {
-    //   uint32_t icVal2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_2);
-    //   if(icVal2 > icVal1)
-    //   {
-
-    //   }
-    // }
-    
+    __HAL_TIM_SET_COUNTER(htim, 0); 
   }
-
-
-	// if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)  // if the interrupt source is channel1
-	// {
-	// 	if (Is_First_Captured==0) // if the first value is not captured
-	// 	{
-	// 		IC_Val1 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1); // read the first value
-	// 		Is_First_Captured = 1;  // set the first captured as true
-	// 	}
-
-	// 	else   // if the first is already captured
-	// 	{
-	// 		IC_Val2 = HAL_TIM_ReadCapturedValue(htim, TIM_CHANNEL_1);  // read second value
-
-	// 		if (IC_Val2 > IC_Val1)
-	// 		{
-	// 			Difference = IC_Val2-IC_Val1;
-	// 		}
-
-	// 		else if (IC_Val1 > IC_Val2)
-	// 		{
-	// 			Difference = (0xffffffff - IC_Val1) + IC_Val2;
-	// 		}
-
-	// 		float refClock = TIMCLOCK/(PRESCALAR);
-	// 		float mFactor = 1000000/refClock;
-
-	// 		usWidth = Difference*mFactor;
-
-	// 		__HAL_TIM_SET_COUNTER(htim, 0);  // reset the counter
-	// 		Is_First_Captured = 0; // set it back to false
-	// 	}
-	// }
 }
 
 // void GCAN_RxMsgPendingCallback(CAN_HandleTypeDef *hcan, U32 fifo_num)
@@ -249,27 +207,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 //   if(hcan == &hcan2)
 //   {
 //     service_can_rx_hardware(hcan, fifo_num);
-//   }
-// }
-
-// void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan)
-// {
-//   // Charger CAN
-//   if(hcan == &hcan1)
-//   {
-//     CAN_RxHeaderTypeDef rxHeader;
-//     uint8_t rxData[8];
-    
-//     HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rxHeader, rxData);
-//     if ((rxHeader.ExtId == CHARGER_CAN_ID_RX) && (rxHeader.DLC == 8))
-//     {
-//       for (int32_t i = 0; i < 5; i++)
-//       {
-//         chargerMessage[i] = rxData[i];
-//       }
-//       newChargerMessage = true;
-//       chargerConnected = true;
-//     }
+//     GCAN_onRX(hcan);
 //   }
 // }
 
@@ -313,7 +251,11 @@ int main(void)
   MX_ADC1_Init();
   MX_CAN2_Init();
   /* USER CODE BEGIN 2 */
-  // S8 init_can(&hcan2, GCAN0);
+  
+  init_can(&hcan1, GCAN0);
+  // init_can(&hcan2, GCAN0);
+  gsense_init(&hcan1, &hadc1, 0, 0, MCU_GSENSE_GPIO_Port, MCU_GSENSE_Pin);
+
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2);
 
   // Activate Charger CAN RX MSG PENDING notification
@@ -358,6 +300,14 @@ int main(void)
   /* definition and creation of idleTask */
   osThreadStaticDef(idleTask, StartIdleTask, osPriorityIdle, 0, 128, idleTaskBuffer, &idleTaskControlBlock);
   idleTaskHandle = osThreadCreate(osThread(idleTask), NULL);
+
+  /* definition and creation of serviceGCAN */
+  osThreadDef(serviceGCAN, runServiceGopherCan, osPriorityHigh, 0, 1024);
+  serviceGCANHandle = osThreadCreate(osThread(serviceGCAN), NULL);
+
+  /* definition and creation of currentSenseTas */
+  osThreadStaticDef(currentSenseTas, StartCurrentSenseTask, osPriorityHigh, 0, 512, currentSenseTasBuffer, &currentSenseTasControlBlock);
+  currentSenseTasHandle = osThreadCreate(osThread(currentSenseTas), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -500,14 +450,14 @@ static void MX_CAN1_Init(void)
 
   /* USER CODE END CAN1_Init 1 */
   hcan1.Instance = CAN1;
-  hcan1.Init.Prescaler = 20;
+  hcan1.Init.Prescaler = 10;
   hcan1.Init.Mode = CAN_MODE_NORMAL;
   hcan1.Init.SyncJumpWidth = CAN_SJW_1TQ;
   hcan1.Init.TimeSeg1 = CAN_BS1_6TQ;
   hcan1.Init.TimeSeg2 = CAN_BS2_1TQ;
   hcan1.Init.TimeTriggeredMode = DISABLE;
   hcan1.Init.AutoBusOff = ENABLE;
-  hcan1.Init.AutoWakeUp = DISABLE;
+  hcan1.Init.AutoWakeUp = ENABLE;
   hcan1.Init.AutoRetransmission = DISABLE;
   hcan1.Init.ReceiveFifoLocked = DISABLE;
   hcan1.Init.TransmitFifoPriority = DISABLE;
@@ -830,16 +780,16 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, AMS_FAULT_OUT_Pin|MCU_FAULT_Pin|MCU_HEARTBEAT_Pin|CP_EN_Pin
-                          |PORTB_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, AMS_FAULT_OUT_Pin|MCU_GSENSE_Pin|MCU_FAULT_Pin|MCU_HEARTBEAT_Pin
+                          |CP_EN_Pin|PORTB_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(PORTA_CS_GPIO_Port, PORTA_CS_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : AMS_FAULT_OUT_Pin MCU_FAULT_Pin MCU_HEARTBEAT_Pin CP_EN_Pin
-                           PORTB_CS_Pin */
-  GPIO_InitStruct.Pin = AMS_FAULT_OUT_Pin|MCU_FAULT_Pin|MCU_HEARTBEAT_Pin|CP_EN_Pin
-                          |PORTB_CS_Pin;
+  /*Configure GPIO pins : AMS_FAULT_OUT_Pin MCU_GSENSE_Pin MCU_FAULT_Pin MCU_HEARTBEAT_Pin
+                           CP_EN_Pin PORTB_CS_Pin */
+  GPIO_InitStruct.Pin = AMS_FAULT_OUT_Pin|MCU_GSENSE_Pin|MCU_FAULT_Pin|MCU_HEARTBEAT_Pin
+                          |CP_EN_Pin|PORTB_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -884,12 +834,13 @@ void StartBmbUpdateTask(void const * argument)
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   initBmbUpdateTask();
-  TickType_t lastBmbUpdateTaskTick = HAL_GetTick();
+  // TickType_t lastBmbUpdateTaskTick = HAL_GetTick();
   const TickType_t bmbUpdateTaskPeriod = pdMS_TO_TICKS(BMB_UPDATE_TASK_PERIOD_MS);
   for(;;)
   {
-    runBmbUpdateTask();
-    vTaskDelayUntil(&lastBmbUpdateTaskTick, bmbUpdateTaskPeriod);
+    osDelay(1000);
+    // runBmbUpdateTask();
+    // vTaskDelayUntil(&lastBmbUpdateTaskTick, bmbUpdateTaskPeriod);
   }
   /* USER CODE END 5 */
 }
@@ -976,6 +927,46 @@ void StartIdleTask(void const * argument)
     osDelay(1);
   }
   /* USER CODE END StartIdleTask */
+}
+
+/* USER CODE BEGIN Header_runServiceGopherCan */
+/**
+* @brief Function implementing the serviceGCAN thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_runServiceGopherCan */
+void runServiceGopherCan(void const * argument)
+{
+  /* USER CODE BEGIN runServiceGopherCan */
+  /* Infinite loop */
+  for(;;)
+  {
+    service_can_rx_buffer();
+    osDelay(1);
+  }
+  /* USER CODE END runServiceGopherCan */
+}
+
+/* USER CODE BEGIN Header_StartCurrentSenseTask */
+/**
+* @brief Function implementing the currentSenseTas thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCurrentSenseTask */
+void StartCurrentSenseTask(void const * argument)
+{
+  /* USER CODE BEGIN StartCurrentSenseTask */
+  /* Infinite loop */
+  initCurrentSenseTask();
+  const TickType_t currentSenseTaskPeriod = pdMS_TO_TICKS(CURRENT_SENSE_TASK_PERIOD_MS);
+  for(;;)
+  {
+    runCurrentSenseTask();
+    osDelay(currentSenseTaskPeriod);
+  }
+  /* USER CODE END StartCurrentSenseTask */
 }
 
 /**
