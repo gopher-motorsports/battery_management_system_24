@@ -9,6 +9,7 @@
 #include "currentSenseTask.h"
 #include "cmsis_os.h"
 #include "alerts.h"
+#include "GopherCAN.h"
 
 /* ==================================================================== */
 /* ============================== STRUCTS ============================= */
@@ -365,4 +366,10 @@ void runPrintTask()
 
     // printTestData(printTaskInputData.bmbTaskData.bmb);
     printActiveAlerts();
+
+    printf("\n");
+    printf("Charger Voltage: %f\n", chargerVoltageSetPoint_V.data);
+    printf("Charger Current: %f\n", chargerCurrentSetPoint_A.data);
+    printf("Charger Status: %X\n", chargerStatusByte.data);
+    printf("\n");
 }

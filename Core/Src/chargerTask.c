@@ -40,7 +40,6 @@ void runChargerTask()
     if(chargerStatusByte.data != 0x00)
     {
         chargerConnected = true;
-        printf("YAY\n");
     }
 
     if(chargerConnected)
