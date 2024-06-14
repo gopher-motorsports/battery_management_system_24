@@ -51,11 +51,11 @@
 #define LOW_CHARGE_CURRENT_A                NUM_PARALLEL_CELLS * LOW_CHARGE_C_RATING * CELL_CAPACITY_MAH * MAH_TO_AH
 
 // The input voltage to the charger in volts
-#define CHARGER_INPUT_VOLTAGE_V             120.0f
+#define CHARGER_INPUT_VOLTAGE_V             220.0f
 // The charger's input breaker current limit
 #define CHARGER_INPUT_CURRENT_A             20.0f
 // The derating factor to apply to the charging current to account for temperature and other environmental factors
-#define CHARGER_CURRENT_DERATING_FACTOR     0.85f
+#define CHARGER_CURRENT_DERATING_FACTOR     0.80f
 // The amount of power that the charger can draw from the wall
 #define CHARGER_INPUT_POWER_W               CHARGER_INPUT_VOLTAGE_V * CHARGER_INPUT_CURRENT_A * CHARGER_CURRENT_DERATING_FACTOR
 // The expected efficiency of the charger
@@ -63,6 +63,7 @@
 // The amount of power that the charger can output to the battery pack
 #define CHARGER_OUTPUT_POWER_W              CHARGER_INPUT_POWER_W * MIN_CHARGER_EFFICIENCY
 
+// #define DEFAULT_CURRENT_LIMIT_A             13.0f
 #define DEFAULT_CURRENT_LIMIT_A             1.0f
 #define CELL_VOLTAGE_TAPER_THRESHOLD        4.2f
 

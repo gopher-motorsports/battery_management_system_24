@@ -112,15 +112,22 @@ void runChargerTask()
                 currentRequest = powerLimitAmps;
             }
 
+            float currentLimitTaper = DEFAULT_CURRENT_LIMIT_A;
             if(maxCellVoltage > CELL_VOLTAGE_TAPER_THRESHOLD)
             {
-                currentRequest = currentLimit * ((MAX_BRICK_VOLTAGE - maxCellVoltage) / (MAX_BRICK_VOLTAGE - CELL_VOLTAGE_TAPER_THRESHOLD));
+                currentLimitTaper = currentLimit * ((MAX_BRICK_VOLTAGE - maxCellVoltage) / (MAX_BRICK_VOLTAGE - CELL_VOLTAGE_TAPER_THRESHOLD));
 
-            }            
+            }   
+
+            // Limit the charge current to the charger max power output if necessary 
+            if(currentRequest > currentLimitTaper)
+            {
+                currentRequest = currentLimitTaper;
+            }         
         }
 
         // Send the calculated voltage and current requests to the charger over CAN
-        sendChargerMessage(voltageRequest, currentRequest, chargeOkay);
+        sendChargerMessage(voltageRequest, 5.0f, true);
 
         // Pass out data
         taskENTER_CRITICAL();
