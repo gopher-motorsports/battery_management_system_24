@@ -316,7 +316,7 @@ static void printActiveAlerts()
 	for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
 	{
 		Alert_S* alert = bmbAlerts[i];
-		if (getAlertStatus(alert) == ALERT_SET)
+		if (getAlertStatus(alert) == ALERT_LATCHED)
 		{
 			printf("%s - ACTIVE!\n", alert->alertName);
 			numActiveAlerts++;
@@ -327,6 +327,23 @@ static void printActiveAlerts()
 		printf("None\n");
 	}
 	printf("\n");
+
+    // printf("Alerts Latched:\n");
+	// uint32_t numActiveAlerts = 0;
+	// for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
+	// {
+	// 	Alert_S* alert = bmbAlerts[i];
+	// 	if (getAlertStatus(alert) == ALERT_LATCHED)
+	// 	{
+	// 		printf("%s - LATCHED!\n", alert->alertName);
+	// 		numActiveAlerts++;
+	// 	}
+	// }
+	// if (numActiveAlerts == 0)
+	// {
+	// 	printf("None\n");
+	// }
+	// printf("\n");
 }
 
 void printSocAndSoe(CurrentSenseTaskOutputData_S currentSenseData)
