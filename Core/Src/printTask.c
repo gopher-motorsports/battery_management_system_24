@@ -387,9 +387,9 @@ void runPrintTask()
     // printTestData(printTaskInputData.bmbTaskData.bmb);
     printActiveAlerts();
 
-    // printf("\n");
-    // printf("Charger Voltage: %f\n", chargerVoltageSetPoint_V.data);
-    // printf("Charger Current: %f\n", chargerCurrentSetPoint_A.data);
-    // printf("Charger Status: %X\n", chargerStatusByte.data);
-    // printf("\n");
+    printf("\n");
+    printf("Charger Voltage: %f\n", chargerVoltageSetPoint_V.data);
+    printf("Charger Current: %f\n", chargerCurrentSetPoint_A.data);
+    printf("Charger Status: %X\n", chargerStatusByte.data);
+    printf("\n");
 }
