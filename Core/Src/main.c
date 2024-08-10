@@ -25,6 +25,7 @@
 #include "printTask.h"
 #include "chargerTask.h"
 #include "idleTask.h"
+#include "gcanUpdateTask.h"
 #include "spi.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -79,6 +80,8 @@ osThreadId idleTaskHandle;
 uint32_t idleTaskBuffer[ 128 ];
 osStaticThreadDef_t idleTaskControlBlock;
 osThreadId serviceGCANHandle;
+uint32_t serviceGCANBuffer[ 2048 ];
+osStaticThreadDef_t serviceGCANControlBlock;
 osThreadId currentSenseTasHandle;
 uint32_t currentSenseTasBuffer[ 512 ];
 osStaticThreadDef_t currentSenseTasControlBlock;
@@ -302,7 +305,7 @@ int main(void)
   idleTaskHandle = osThreadCreate(osThread(idleTask), NULL);
 
   /* definition and creation of serviceGCAN */
-  osThreadDef(serviceGCAN, runServiceGopherCan, osPriorityHigh, 0, 1024);
+  osThreadStaticDef(serviceGCAN, runServiceGopherCan, osPriorityHigh, 0, 2048, serviceGCANBuffer, &serviceGCANControlBlock);
   serviceGCANHandle = osThreadCreate(osThread(serviceGCAN), NULL);
 
   /* definition and creation of currentSenseTas */
@@ -940,8 +943,10 @@ void runServiceGopherCan(void const * argument)
 {
   /* USER CODE BEGIN runServiceGopherCan */
   /* Infinite loop */
+  initGcanUpdateTask();
   for(;;)
   {
+    runGcanUpdateTask();
     service_can_rx_buffer();
     osDelay(1);
   }

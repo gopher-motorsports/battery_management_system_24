@@ -771,6 +771,19 @@ static void aggregatePackData(BmbTaskOutputData_S* bmbData)
 		{
 			minCellVoltage = pBmb->minBrickVoltage;
 		}
+        
+        for (uint16_t i = 0; i < NUM_CELLS_PER_BMB; i++) {
+
+            if (pBmb->cellTemp[i] > maxCellTemp)
+            {
+                maxCellTemp = pBmb->cellTemp[i];
+            }
+            if (pBmb->cellTemp[i] < minCellTemp)
+            {
+                minCellTemp = pBmb->cellTemp[i];
+            }
+
+        }
 
 		if (pBmb->maxBrickVoltage > maxCellVoltage)
 		{

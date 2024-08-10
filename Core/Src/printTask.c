@@ -377,6 +377,9 @@ void runPrintTask()
 
     printf("\n");
     printf("Min Cell V: %f\n", printTaskInputData.bmbTaskData.minCellVoltage);
+    printf("Max Cell V: %f\n", printTaskInputData.bmbTaskData.maxCellVoltage);
+    printf("Max Cell Temp: %f\n", printTaskInputData.bmbTaskData.maxCellTemp);
+    printf("Average Cell Temp: %f\n", printTaskInputData.bmbTaskData.avgCellTemp);
     printf("Tractive Current: %6.3f\n", printTaskInputData.currentSenseData.tractiveSystemCurrent);
     printSocAndSoe(printTaskInputData.currentSenseData);
     printf("\n");
