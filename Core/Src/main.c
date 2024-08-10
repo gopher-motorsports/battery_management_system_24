@@ -80,8 +80,6 @@ osThreadId idleTaskHandle;
 uint32_t idleTaskBuffer[ 128 ];
 osStaticThreadDef_t idleTaskControlBlock;
 osThreadId serviceGCANHandle;
-uint32_t serviceGCANBuffer[ 2048 ];
-osStaticThreadDef_t serviceGCANControlBlock;
 osThreadId currentSenseTasHandle;
 uint32_t currentSenseTasBuffer[ 512 ];
 osStaticThreadDef_t currentSenseTasControlBlock;
@@ -305,7 +303,7 @@ int main(void)
   idleTaskHandle = osThreadCreate(osThread(idleTask), NULL);
 
   /* definition and creation of serviceGCAN */
-  osThreadStaticDef(serviceGCAN, runServiceGopherCan, osPriorityHigh, 0, 2048, serviceGCANBuffer, &serviceGCANControlBlock);
+  osThreadDef(serviceGCAN, runServiceGopherCan, osPriorityHigh, 0, 2048);
   serviceGCANHandle = osThreadCreate(osThread(serviceGCAN), NULL);
 
   /* definition and creation of currentSenseTas */

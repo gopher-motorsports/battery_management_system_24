@@ -221,7 +221,7 @@ static void runBmbAlertMonitor(BmbTaskOutputData_S* bmbData);
         else if(error == TRANSACTION_CRC_ERROR) \
         { \
             Debug("Chain break!\n"); \
-            return; \
+            // return; \
         } \
         else if(error == TRANSACTION_COMMAND_COUNTER_ERROR) \
         { \
@@ -1389,16 +1389,16 @@ void runBmbUpdateTask()
     status = updateCellVoltages(&bmbTaskOutputDataLocal);
     HANDLE_BMB_ERROR(status);
 
-    status = updateCellTemps(bmbTaskOutputDataLocal.bmb);
-    HANDLE_BMB_ERROR(status);
+    // status = updateCellTemps(bmbTaskOutputDataLocal.bmb);
+    // HANDLE_BMB_ERROR(status);
 
     aggregatePackData(&bmbTaskOutputDataLocal);
 
-    status = updateTestData(bmbTaskOutputDataLocal.bmb);
-    HANDLE_BMB_ERROR(status);
+    // status = updateTestData(bmbTaskOutputDataLocal.bmb);
+    // HANDLE_BMB_ERROR(status);
 
-    status = runSwitchPinStateMachine(&bmbTaskOutputDataLocal, chargerConnected);
-    HANDLE_BMB_ERROR(status);    
+    // status = runSwitchPinStateMachine(&bmbTaskOutputDataLocal, chargerConnected);
+    // HANDLE_BMB_ERROR(status);    
 
     runBmbAlertMonitor(&bmbTaskOutputData);
 
