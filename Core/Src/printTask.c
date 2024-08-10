@@ -316,7 +316,7 @@ static void printActiveAlerts()
 	for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
 	{
 		Alert_S* alert = bmbAlerts[i];
-		if (getAlertStatus(alert) == ALERT_LATCHED)
+		if (getAlertStatus(alert) == ALERT_SET)
 		{
 			printf("%s - ACTIVE!\n", alert->alertName);
 			numActiveAlerts++;
@@ -328,22 +328,22 @@ static void printActiveAlerts()
 	}
 	printf("\n");
 
-    // printf("Alerts Latched:\n");
-	// uint32_t numActiveAlerts = 0;
-	// for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
-	// {
-	// 	Alert_S* alert = bmbAlerts[i];
-	// 	if (getAlertStatus(alert) == ALERT_LATCHED)
-	// 	{
-	// 		printf("%s - LATCHED!\n", alert->alertName);
-	// 		numActiveAlerts++;
-	// 	}
-	// }
-	// if (numActiveAlerts == 0)
-	// {
-	// 	printf("None\n");
-	// }
-	// printf("\n");
+    printf("Alerts Latched:\n");
+	uint32_t numLatchedAlerts = 0;
+	for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
+	{
+		Alert_S* alert = bmbAlerts[i];
+		if (getAlertStatus(alert) == ALERT_LATCHED)
+		{
+			printf("%s - LATCHED!\n", alert->alertName);
+			numLatchedAlerts++;
+		}
+	}
+	if (numLatchedAlerts == 0)
+	{
+		printf("None\n");
+	}
+	printf("\n");
 }
 
 void printSocAndSoe(CurrentSenseTaskOutputData_S currentSenseData)
@@ -376,17 +376,19 @@ void runPrintTask()
     printCellTemps(printTaskInputData.bmbTaskData.bmb);
 
     printf("\n");
-    printf("Min Cell V: %f\n", printTaskInputData.bmbTaskData.minCellVoltage);
-    printf("Tractive Current: %6.3f\n", printTaskInputData.currentSenseData.tractiveSystemCurrent);
-    printSocAndSoe(printTaskInputData.currentSenseData);
+    // printf("%sred\n", KRED);
+    // printf("%snormal\n", KNRM);
+    // printf("Min Cell V: %f\n", printTaskInputData.bmbTaskData.minCellVoltage);
+    // printf("Tractive Current: %6.3f\n", printTaskInputData.currentSenseData.tractiveSystemCurrent);
+    // printSocAndSoe(printTaskInputData.currentSenseData);
     printf("\n");
 
     // printTestData(printTaskInputData.bmbTaskData.bmb);
     printActiveAlerts();
 
-    printf("\n");
-    printf("Charger Voltage: %f\n", chargerVoltageSetPoint_V.data);
-    printf("Charger Current: %f\n", chargerCurrentSetPoint_A.data);
-    printf("Charger Status: %X\n", chargerStatusByte.data);
-    printf("\n");
+    // printf("\n");
+    // printf("Charger Voltage: %f\n", chargerVoltageSetPoint_V.data);
+    // printf("Charger Current: %f\n", chargerCurrentSetPoint_A.data);
+    // printf("Charger Status: %X\n", chargerStatusByte.data);
+    // printf("\n");
 }
