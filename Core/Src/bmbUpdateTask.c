@@ -221,7 +221,7 @@ static void runBmbAlertMonitor(BmbTaskOutputData_S* bmbData);
         else if(error == TRANSACTION_CRC_ERROR) \
         { \
             Debug("Chain break!\n"); \
-            // return; \
+            /* return; */ \
         } \
         else if(error == TRANSACTION_COMMAND_COUNTER_ERROR) \
         { \
