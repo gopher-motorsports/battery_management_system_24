@@ -15,6 +15,7 @@
 #include "alerts.h"
 #include "packData.h"
 #include "bmbUtils.h"
+#include "stm32f4xx_ll_rcc.h"
 
 /* ==================================================================== */
 /* ============================= DEFINES ============================== */
@@ -1389,8 +1390,8 @@ void runBmbUpdateTask()
     status = updateCellVoltages(&bmbTaskOutputDataLocal);
     HANDLE_BMB_ERROR(status);
 
-    // status = updateCellTemps(bmbTaskOutputDataLocal.bmb);
-    // HANDLE_BMB_ERROR(status);
+    status = updateCellTemps(bmbTaskOutputDataLocal.bmb);
+    HANDLE_BMB_ERROR(status);
 
     aggregatePackData(&bmbTaskOutputDataLocal);
 
@@ -1405,6 +1406,14 @@ void runBmbUpdateTask()
     taskENTER_CRITICAL();
     bmbTaskOutputData = bmbTaskOutputDataLocal;
     taskEXIT_CRITICAL();
+
+    if(LL_RCC_IsActiveFlag_PORRST()) {
+        printf("!!!!!!!!!!!!!!!!!!!!!!\n");
+        printf("!! BMS POR DETECTED !!\n");
+        printf("!!!!!!!!!!!!!!!!!!!!!!\n");
+        LL_RCC_ClearResetFlags();
+    }
+    printf("Time since POR:  %lds\n", HAL_GetTick() / 1000);
 
     // printf("Task Time: %lu\n", HAL_GetTick()-start);
 

@@ -862,7 +862,7 @@ void StartPrintTask(void const * argument)
   const TickType_t printTaskPeriod = pdMS_TO_TICKS(PRINT_TASK_PERIOD_MS);
   for(;;)
   {
-    runPrintTask();
+    // runPrintTask();
     vTaskDelayUntil(&lastPrintTaskTick, printTaskPeriod);
   }
   /* USER CODE END StartPrintTask */

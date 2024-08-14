@@ -92,6 +92,9 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
+  printf("!!!!!!!!!!!!!!!!!!!!!!!!\n");
+  printf("!! Hardfault Detected !!\n");
+  printf("!!!!!!!!!!!!!!!!!!!!!!!!\n");
   // Turn off the heartbeat LED
   HAL_GPIO_WritePin(MCU_HEARTBEAT_GPIO_Port, MCU_HEARTBEAT_Pin, GPIO_PIN_RESET);
   uint32_t tim6Period = htim6.Init.Period;
