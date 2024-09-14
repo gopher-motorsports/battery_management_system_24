@@ -257,7 +257,8 @@ static bool initBmbs()
 
     // uint8_t data[6] = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
     // initSuccess |= (writeAll(WR_CFG_REG_A, NUM_BMBS_IN_ACCUMULATOR, data) != TRANSACTION_SUCCESS);
-    initSuccess &= (commandAll((CMD_START_CADC | ADC_CONT), NUM_BMBS_IN_ACCUMULATOR) == TRANSACTION_SUCCESS);
+    TRANSACTION_STATUS_E status = commandAll((CMD_START_CADC | ADC_CONT), NUM_BMBS_IN_ACCUMULATOR);
+    initSuccess &= (status == TRANSACTION_SUCCESS);
     initSuccess &= (commandAll(CMD_START_AUX_ADC, NUM_BMBS_IN_ACCUMULATOR) == TRANSACTION_SUCCESS);
 
     if(!initSuccess)
@@ -1350,7 +1351,19 @@ static void runBmbAlertMonitor(BmbTaskOutputData_S* bmbData)
             }
         }
     }
-    setAmsFault(responseStatus[AMS_FAULT]);
+    if(responseStatus[AMS_FAULT])
+    {
+        for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
+        {
+            Alert_S* alert = bmbAlerts[i];
+            if (getAlertStatus(alert) == ALERT_SET)
+            {
+                printf("%s - ACTIVE!\n", alert->alertName);
+            }
+        }
+        setAmsFault(true);
+    }
+    // setAmsFault(responseStatus[AMS_FAULT]);
 }
 
 /* ==================================================================== */
@@ -1388,9 +1401,19 @@ void runBmbUpdateTask()
     TRANSACTION_STATUS_E status;
 
     status = updateCellVoltages(&bmbTaskOutputDataLocal);
+    if(status == TRANSACTION_CRC_ERROR)
+    {
+        printf("Stop");
+        while(1);
+    }
     HANDLE_BMB_ERROR(status);
 
     status = updateCellTemps(bmbTaskOutputDataLocal.bmb);
+    if(status == TRANSACTION_CRC_ERROR)
+    {
+        printf("Stop");
+        while(1);
+    }
     HANDLE_BMB_ERROR(status);
 
     aggregatePackData(&bmbTaskOutputDataLocal);
@@ -1413,7 +1436,7 @@ void runBmbUpdateTask()
         printf("!!!!!!!!!!!!!!!!!!!!!!\n");
         LL_RCC_ClearResetFlags();
     }
-    printf("Time since POR:  %lds\n", HAL_GetTick() / 1000);
+    // printf("Time since POR:  %lds\n", HAL_GetTick() / 1000);
 
     // printf("Task Time: %lu\n", HAL_GetTick()-start);
 
