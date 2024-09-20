@@ -183,6 +183,8 @@ const float boardTempVoltageArray[LUT_SIZE] =
 LookupTable_S cellTempTable =  { .length = LUT_SIZE, .x = cellTempVoltageArray, .y = temperatureArray};
 LookupTable_S boardTempTable = { .length = LUT_SIZE, .x = boardTempVoltageArray, .y = temperatureArray};
 
+extern SPI_HandleTypeDef hspi1;
+
 /* ==================================================================== */
 /* =================== LOCAL FUNCTION DECLARATIONS ==================== */
 /* ==================================================================== */
@@ -210,8 +212,8 @@ static void runBmbAlertMonitor(BmbTaskOutputData_S* bmbData);
     if(error != TRANSACTION_SUCCESS) { \
         if(error == TRANSACTION_SPI_ERROR) \
         { \
-            Debug("SPI Failure, reseting STM32...\n"); \
-            HAL_NVIC_SystemReset(); \
+            /* Debug("SPI Failure, reseting STM32...\n"); */ \
+            /* HAL_NVIC_SystemReset(); */ \
         } \
         else if(error == TRANSACTION_POR_ERROR) \
         { \
@@ -222,6 +224,7 @@ static void runBmbAlertMonitor(BmbTaskOutputData_S* bmbData);
         else if(error == TRANSACTION_CRC_ERROR) \
         { \
             Debug("Chain break!\n"); \
+            bmbsInit = initBmbs(); \
             /* return; */ \
         } \
         else if(error == TRANSACTION_COMMAND_COUNTER_ERROR) \
@@ -257,13 +260,25 @@ static bool initBmbs()
 
     // uint8_t data[6] = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00};
     // initSuccess |= (writeAll(WR_CFG_REG_A, NUM_BMBS_IN_ACCUMULATOR, data) != TRANSACTION_SUCCESS);
+
+    commandAll((CMD_START_CADC | ADC_CONT), NUM_BMBS_IN_ACCUMULATOR);
+    commandAll((CMD_START_CADC | ADC_CONT), NUM_BMBS_IN_ACCUMULATOR);
+    commandAll((CMD_START_CADC | ADC_CONT), NUM_BMBS_IN_ACCUMULATOR);
+    commandAll((CMD_START_CADC | ADC_CONT), NUM_BMBS_IN_ACCUMULATOR);
+	commandAll((CMD_START_CADC | ADC_CONT), NUM_BMBS_IN_ACCUMULATOR);
+
     TRANSACTION_STATUS_E status = commandAll((CMD_START_CADC | ADC_CONT), NUM_BMBS_IN_ACCUMULATOR);
     initSuccess &= (status == TRANSACTION_SUCCESS);
-    initSuccess &= (commandAll(CMD_START_AUX_ADC, NUM_BMBS_IN_ACCUMULATOR) == TRANSACTION_SUCCESS);
+    status = commandAll(CMD_START_AUX_ADC, NUM_BMBS_IN_ACCUMULATOR);
+    initSuccess &= (status == TRANSACTION_SUCCESS);
 
     if(!initSuccess)
     {
+//    	Debug("1\n");
         Debug("BMBs failed to initialize!\n");
+        HAL_SPI_Abort(&hspi1);
+        vTaskDelay(5000);
+//        HAL_NVIC_SystemReset();
         return false;
     }
     Debug("BMB initialization successful!\n");
@@ -554,8 +569,12 @@ static TRANSACTION_STATUS_E updateCellVoltages(BmbTaskOutputData_S* bmbData)
                     uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
                     uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
                     uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-                    bmbData->bmb[k].cellVoltage[(i * CELLS_PER_REG) + j] = CONVERT_16_BIT_ADC(rawAdc);
-                    bmbData->bmb[k].cellVoltageStatus[(i * CELLS_PER_REG) + j] = GOOD;
+                    float cellV = CONVERT_16_BIT_ADC(rawAdc);
+                    if(cellV > 1.0f)
+                    {
+                    	bmbData->bmb[k].cellVoltage[(i * CELLS_PER_REG) + j] = cellV;
+						bmbData->bmb[k].cellVoltageStatus[(i * CELLS_PER_REG) + j] = GOOD;
+                    }
                 }
             }
         }
@@ -571,8 +590,12 @@ static TRANSACTION_STATUS_E updateCellVoltages(BmbTaskOutputData_S* bmbData)
             uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES)];
             uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + 1];
             uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-            bmbData->bmb[k].cellVoltage[(5 * CELLS_PER_REG)] = CONVERT_16_BIT_ADC(rawAdc);
-            bmbData->bmb[k].cellVoltageStatus[(5 * CELLS_PER_REG)] = GOOD;
+            float cellV = CONVERT_16_BIT_ADC(rawAdc);
+			if(cellV > 1.0f)
+			{
+				bmbData->bmb[k].cellVoltage[(5 * CELLS_PER_REG)] = cellV;
+				bmbData->bmb[k].cellVoltageStatus[(5 * CELLS_PER_REG)] = GOOD;
+			}
         }
 
         // Update avg cell voltages from avg CADC registers
@@ -591,8 +614,12 @@ static TRANSACTION_STATUS_E updateCellVoltages(BmbTaskOutputData_S* bmbData)
                     uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
                     uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
                     uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-                    bmbData->bmb[k].cellVoltageAvg[(i * CELLS_PER_REG) + j] = CONVERT_16_BIT_ADC(rawAdc);
-                    bmbData->bmb[k].cellVoltageAvgStatus[(i * CELLS_PER_REG) + j] = GOOD;
+                    float cellV = CONVERT_16_BIT_ADC(rawAdc);
+					if(cellV > 1.0f)
+					{
+						bmbData->bmb[k].cellVoltageAvg[(i * CELLS_PER_REG) + j] = cellV;
+						bmbData->bmb[k].cellVoltageAvgStatus[(i * CELLS_PER_REG) + j] = GOOD;
+					}
                 }
             }
         }
@@ -608,8 +635,12 @@ static TRANSACTION_STATUS_E updateCellVoltages(BmbTaskOutputData_S* bmbData)
             uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES)];
             uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + 1];
             uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-            bmbData->bmb[k].cellVoltageAvg[(5 * CELLS_PER_REG)] = CONVERT_16_BIT_ADC(rawAdc);
-            bmbData->bmb[k].cellVoltageAvgStatus[(5 * CELLS_PER_REG)] = GOOD;
+            float cellV = CONVERT_16_BIT_ADC(rawAdc);
+			if(cellV > 1.0f)
+			{
+				bmbData->bmb[k].cellVoltageAvg[(5 * CELLS_PER_REG)] = cellV;
+				bmbData->bmb[k].cellVoltageAvgStatus[(5 * CELLS_PER_REG)] = GOOD;
+			}
         }
 
         // Update filtered cell voltages from filtered CADC registers
@@ -628,8 +659,12 @@ static TRANSACTION_STATUS_E updateCellVoltages(BmbTaskOutputData_S* bmbData)
                     uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE)];
                     uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + (j * CELL_REG_SIZE) + 1];
                     uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-                    bmbData->bmb[k].cellVoltageFiltered[(i * CELLS_PER_REG) + j] = CONVERT_16_BIT_ADC(rawAdc);
-                    bmbData->bmb[k].cellVoltageFilteredStatus[(i * CELLS_PER_REG) + j] = GOOD;
+                    float cellV = CONVERT_16_BIT_ADC(rawAdc);
+					if(cellV > 1.0f)
+					{
+						bmbData->bmb[k].cellVoltageFiltered[(i * CELLS_PER_REG) + j] = cellV;
+						bmbData->bmb[k].cellVoltageFilteredStatus[(i * CELLS_PER_REG) + j] = GOOD;
+					}
                 }
             }
         }
@@ -645,8 +680,12 @@ static TRANSACTION_STATUS_E updateCellVoltages(BmbTaskOutputData_S* bmbData)
             uint16_t rawAdcLSB = registerData[(k * REGISTER_SIZE_BYTES)];
             uint16_t rawAdcMSB = registerData[(k * REGISTER_SIZE_BYTES) + 1];
             uint16_t rawAdc = (rawAdcMSB << BITS_IN_BYTE) | (rawAdcLSB);
-            bmbData->bmb[k].cellVoltageFiltered[(5 * CELLS_PER_REG)] = CONVERT_16_BIT_ADC(rawAdc);
-            bmbData->bmb[k].cellVoltageFilteredStatus[(5 * CELLS_PER_REG)] = GOOD;
+            float cellV = CONVERT_16_BIT_ADC(rawAdc);
+			if(cellV > 1.0f)
+			{
+				bmbData->bmb[k].cellVoltageFiltered[(5 * CELLS_PER_REG)] = cellV;
+				bmbData->bmb[k].cellVoltageFilteredStatus[(5 * CELLS_PER_REG)] = GOOD;
+			}
         }
 
         msgStatus = commandAll(CMD_START_CADC | ADC_CONT | ADC_RD, NUM_BMBS_IN_ACCUMULATOR);
@@ -1351,19 +1390,28 @@ static void runBmbAlertMonitor(BmbTaskOutputData_S* bmbData)
             }
         }
     }
-    if(responseStatus[AMS_FAULT])
-    {
-        for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
-        {
-            Alert_S* alert = bmbAlerts[i];
-            if (getAlertStatus(alert) == ALERT_SET)
-            {
-                printf("%s - ACTIVE!\n", alert->alertName);
-            }
-        }
-        setAmsFault(true);
-    }
-    // setAmsFault(responseStatus[AMS_FAULT]);
+//    if(responseStatus[AMS_FAULT])
+//    {
+//        for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
+//        {
+//            Alert_S* alert = bmbAlerts[i];
+//            if (getAlertStatus(alert) == ALERT_SET)
+//            {
+//                printf("%s - ACTIVE!\n", alert->alertName);
+//            }
+//        }
+//        setAmsFault(true);
+//    }
+	for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
+	{
+		Alert_S* alert = bmbAlerts[i];
+		if (getAlertStatus(alert) == ALERT_LATCHED)
+		{
+			printf("%s - ACTIVE!\n", alert->alertName);
+		}
+	}
+
+    setAmsFault(responseStatus[AMS_FAULT]);
 }
 
 /* ==================================================================== */
@@ -1375,6 +1423,7 @@ void initBmbUpdateTask()
     // // TODO Remove for custom hardware where master pins tied high
     // HAL_GPIO_WritePin(MAS1_GPIO_Port, MAS1_Pin, SET);
     // HAL_GPIO_WritePin(MAS2_GPIO_Port, MAS2_Pin, SET);
+	vTaskDelay(3000);
     HAL_GPIO_WritePin(AMS_FAULT_OUT_GPIO_Port, AMS_FAULT_OUT_Pin, GPIO_PIN_SET);
 }
 
@@ -1401,19 +1450,19 @@ void runBmbUpdateTask()
     TRANSACTION_STATUS_E status;
 
     status = updateCellVoltages(&bmbTaskOutputDataLocal);
-    if(status == TRANSACTION_CRC_ERROR)
-    {
-        printf("Stop");
-        while(1);
-    }
+//    if(status == TRANSACTION_SPI_ERROR)
+//    {
+//        printf("Stop\n");
+////        while(1);
+//    }
     HANDLE_BMB_ERROR(status);
 
     status = updateCellTemps(bmbTaskOutputDataLocal.bmb);
-    if(status == TRANSACTION_CRC_ERROR)
-    {
-        printf("Stop");
-        while(1);
-    }
+//    if(status == TRANSACTION_SPI_ERROR)
+//    {
+//        printf("Stop\n");
+////        while(1);
+//    }
     HANDLE_BMB_ERROR(status);
 
     aggregatePackData(&bmbTaskOutputDataLocal);
@@ -1426,16 +1475,18 @@ void runBmbUpdateTask()
 
     runBmbAlertMonitor(&bmbTaskOutputData);
 
+//    printf("task\n");
+
     taskENTER_CRITICAL();
     bmbTaskOutputData = bmbTaskOutputDataLocal;
     taskEXIT_CRITICAL();
 
-    if(LL_RCC_IsActiveFlag_PORRST()) {
-        printf("!!!!!!!!!!!!!!!!!!!!!!\n");
-        printf("!! BMS POR DETECTED !!\n");
-        printf("!!!!!!!!!!!!!!!!!!!!!!\n");
-        LL_RCC_ClearResetFlags();
-    }
+//    if(LL_RCC_IsActiveFlag_PORRST()) {
+////        printf("!!!!!!!!!!!!!!!!!!!!!!\n");
+//        printf("!! BMS POR DETECTED !!\n");
+////        printf("!!!!!!!!!!!!!!!!!!!!!!\n");
+//        LL_RCC_ClearResetFlags();
+//    }
     // printf("Time since POR:  %lds\n", HAL_GetTick() / 1000);
 
     // printf("Task Time: %lu\n", HAL_GetTick()-start);

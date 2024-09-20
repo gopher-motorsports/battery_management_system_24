@@ -65,7 +65,7 @@ TIM_HandleTypeDef htim4;
 UART_HandleTypeDef huart1;
 
 osThreadId bmbUpdateTaskHandle;
-uint32_t bmbUpdateTaskBuffer[ 4096 ];
+uint32_t bmbUpdateTaskBuffer[ 8192 ];
 osStaticThreadDef_t bmbUpdateTaskControlBlock;
 osThreadId printTaskHandle;
 uint32_t printTaskBuffer[ 4096 ];
@@ -283,7 +283,7 @@ int main(void)
 
   /* Create the thread(s) */
   /* definition and creation of bmbUpdateTask */
-  osThreadStaticDef(bmbUpdateTask, StartBmbUpdateTask, osPriorityNormal, 0, 4096, bmbUpdateTaskBuffer, &bmbUpdateTaskControlBlock);
+  osThreadStaticDef(bmbUpdateTask, StartBmbUpdateTask, osPriorityNormal, 0, 8192, bmbUpdateTaskBuffer, &bmbUpdateTaskControlBlock);
   bmbUpdateTaskHandle = osThreadCreate(osThread(bmbUpdateTask), NULL);
 
   /* definition and creation of printTask */
@@ -303,7 +303,7 @@ int main(void)
   idleTaskHandle = osThreadCreate(osThread(idleTask), NULL);
 
   /* definition and creation of serviceGCAN */
-  osThreadDef(serviceGCAN, runServiceGopherCan, osPriorityHigh, 0, 2048);
+  osThreadDef(serviceGCAN, runServiceGopherCan, osPriorityNormal, 0, 2048);
   serviceGCANHandle = osThreadCreate(osThread(serviceGCAN), NULL);
 
   /* definition and creation of currentSenseTas */
@@ -946,7 +946,7 @@ void runServiceGopherCan(void const * argument)
   {
     runGcanUpdateTask();
     service_can_rx_buffer();
-    osDelay(1);
+    osDelay(25);
   }
   /* USER CODE END runServiceGopherCan */
 }

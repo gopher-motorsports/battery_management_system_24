@@ -662,7 +662,7 @@ void wakeChain(uint32_t numBmbs)
         openPort(wakeOriginPort);
         closePort(wakeOriginPort);
         SPI_TRANSMIT(HAL_SPI_TransmitReceive_IT, &hspi1, SPI_TIMEOUT_MS, txBuffer, rxBuffer, packetLength);
-        // vTaskDelay(1 * portTICK_PERIOD_MS);
+//        vTaskDelay(1 * portTICK_PERIOD_MS);
     }
 
     // Swap the wake origin port

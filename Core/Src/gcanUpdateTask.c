@@ -184,8 +184,15 @@ void runGcanUpdateTask()
 		{
 			lastHighFreqGcanUpdate = HAL_GetTick();
 
+//			static float a = 0;
+//			a += 1.0;
+//			if(a > 100.0f)
+//			{
+//				a = 0.0f;
+//			}
+
 			update_and_queue_param_float(&soeByOCV_percent, gcanTaskInputData.currentSenseData.soc.soeByOcv * 100.0f);
-			update_and_queue_param_float(&soeByCoulombCounting_percent, gcanTaskInputData.currentSenseData.soc.soeByCoulombCounting * 100.0f);
+			update_and_queue_param_float(&soeByCoulombCounting_percent, gcanTaskInputData.currentSenseData.soc.soeByOcv * 100.0f);
 
 			update_and_queue_param_float(&bmsAveBrickVoltage_V, gcanTaskInputData.bmbTaskData.avgBrickV);
 			update_and_queue_param_float(&bmsMaxBrickVoltage_V, gcanTaskInputData.bmbTaskData.maxCellVoltage);
@@ -198,6 +205,23 @@ void runGcanUpdateTask()
 			update_and_queue_param_float(&bmsAveBoardTemp_C, gcanTaskInputData.bmbTaskData.avgBoardTemp);
 			update_and_queue_param_float(&bmsMaxBoardTemp_C, gcanTaskInputData.bmbTaskData.maxBoardTemp);
 			update_and_queue_param_float(&bmsMinBoardTemp_C, gcanTaskInputData.bmbTaskData.minBoardTemp);
+
+//			update_and_queue_param_float(&soeByOCV_percent, gcanTaskInputData.currentSenseData.soc.soeByOcv * 100.0f);
+//			update_and_queue_param_float(&soeByCoulombCounting_percent, gcanTaskInputData.currentSenseData.soc.soeByCoulombCounting * 100.0f);
+//
+//			update_and_queue_param_float(&bmsAveBrickVoltage_V, gcanTaskInputData.bmbTaskData.avgBrickV);
+//			update_and_queue_param_float(&bmsMaxBrickVoltage_V, gcanTaskInputData.bmbTaskData.maxCellVoltage);
+//			update_and_queue_param_float(&bmsMinBrickVoltage_V, gcanTaskInputData.bmbTaskData.minCellVoltage);
+//
+//			update_and_queue_param_float(&bmsAveBrickTemp_C, gcanTaskInputData.bmbTaskData.avgCellTemp);
+//			update_and_queue_param_float(&bmsMaxBrickTemp_C, gcanTaskInputData.bmbTaskData.maxCellTemp);
+//			update_and_queue_param_float(&bmsMinBrickTemp_C, gcanTaskInputData.bmbTaskData.minCellTemp);
+//
+//			update_and_queue_param_float(&bmsAveBoardTemp_C, gcanTaskInputData.bmbTaskData.avgBoardTemp);
+//			update_and_queue_param_float(&bmsMaxBoardTemp_C, gcanTaskInputData.bmbTaskData.maxBoardTemp);
+//			update_and_queue_param_float(&bmsMinBoardTemp_C, gcanTaskInputData.bmbTaskData.minBoardTemp);
+
+			service_can_tx(&hcan2);
 		}
 
 		// // Log gcan variables across the alloted time period in data chunks
@@ -297,7 +321,7 @@ void runGcanUpdateTask()
 		// 	gcanUpdateState++;
 		// 	gcanUpdateState %= NUM_GCAN_STATES;
 
-		// 	service_can_tx(&hcan2);
+//		 	service_can_tx(&hcan2);
 		// }
 	}
     
