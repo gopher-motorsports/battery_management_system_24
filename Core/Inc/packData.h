@@ -2,7 +2,7 @@
 #define INC_PACKDATA_H_
 
 // The number of Cells in a cell brick
-#define NUM_PARALLEL_CELLS          		7
+#define NUM_PARALLEL_CELLS          		1
 
 #define MAX_TEMP_SENSOR_VALUE_C     120.0f
 #define MIN_TEMP_SENSOR_VALUE_C     -40.0f

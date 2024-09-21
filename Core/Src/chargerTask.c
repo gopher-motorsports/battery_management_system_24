@@ -127,7 +127,7 @@ void runChargerTask()
         }
 
         // Send the calculated voltage and current requests to the charger over CAN
-        sendChargerMessage(voltageRequest, 5.0f, true);
+        sendChargerMessage(voltageRequest, currentRequest, true);
 
         // Pass out data
         taskENTER_CRITICAL();

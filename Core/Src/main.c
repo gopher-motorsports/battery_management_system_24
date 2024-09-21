@@ -255,7 +255,7 @@ int main(void)
   
   init_can(&hcan1, GCAN0);
   init_can(&hcan2, GCAN0);
-  gsense_init(&hcan2, &hadc1, 0, 0, MCU_GSENSE_GPIO_Port, MCU_GSENSE_Pin);
+  gsense_init(&hcan2, &hadc1, NULL, NULL, MCU_GSENSE_GPIO_Port, MCU_GSENSE_Pin);
 
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2);
 
