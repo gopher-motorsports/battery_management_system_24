@@ -192,7 +192,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 //   {
 //     CAN_RxHeaderTypeDef rxHeader;
 //     uint8_t rxData[8];
-    
+//
 //     HAL_CAN_GetRxMessage(hcan, fifo_num, &rxHeader, rxData);
 //     if ((rxHeader.ExtId == CHARGER_CAN_ID_RX) && (rxHeader.DLC == 8))
 //     {
@@ -203,7 +203,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 //       newChargerMessage = true;
 //     }
 //   }
-
+//
 //   // Gopher CAN
 //   if(hcan == &hcan2)
 //   {
@@ -254,14 +254,14 @@ int main(void)
   /* USER CODE BEGIN 2 */
   
   init_can(&hcan1, GCAN0);
-  init_can(&hcan2, GCAN0);
-  gsense_init(&hcan2, &hadc1, NULL, NULL, MCU_GSENSE_GPIO_Port, MCU_GSENSE_Pin);
+//  init_can(&hcan2, GCAN0);
+//  gsense_init(&hcan2, &hadc1, NULL, NULL, MCU_GSENSE_GPIO_Port, MCU_GSENSE_Pin);
 
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2);
 
   // Activate Charger CAN RX MSG PENDING notification
-  // HAL_CAN_Start(&hcan1);
-  // HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
+//   HAL_CAN_Start(&hcan1);
+//   HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
   /* USER CODE END 2 */
 
@@ -862,7 +862,7 @@ void StartPrintTask(void const * argument)
   const TickType_t printTaskPeriod = pdMS_TO_TICKS(PRINT_TASK_PERIOD_MS);
   for(;;)
   {
-    // runPrintTask();
+    runPrintTask();
     vTaskDelayUntil(&lastPrintTaskTick, printTaskPeriod);
   }
   /* USER CODE END StartPrintTask */
@@ -941,12 +941,12 @@ void runServiceGopherCan(void const * argument)
 {
   /* USER CODE BEGIN runServiceGopherCan */
   /* Infinite loop */
-  initGcanUpdateTask();
+//  initGcanUpdateTask();
   for(;;)
   {
-    runGcanUpdateTask();
+//    runGcanUpdateTask();
     service_can_rx_buffer();
-    osDelay(25);
+    osDelay(1);
   }
   /* USER CODE END runServiceGopherCan */
 }

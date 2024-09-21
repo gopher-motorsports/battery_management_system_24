@@ -84,11 +84,11 @@ static void printCellVoltages(Bmb_S* bmb)
 
                     if((bmb[j].cellVoltage[i] < 0.0f) || bmb[j].cellVoltage[i] >= 100.0f)
                     {
-                        printf(" %5.3f   |", (double)bmb[j].cellVoltage[i]);
+                        printf(" %5.3f   |", (float)bmb[j].cellVoltage[i]);
                     }
                     else
                     {
-                        printf("  %5.3f   |", (double)bmb[j].cellVoltage[i]);
+                        printf("  %5.3f   |", (float)bmb[j].cellVoltage[i]);
                     }
                 }
                 else
@@ -372,8 +372,8 @@ void runPrintTask()
     taskEXIT_CRITICAL();
 
     printf("\e[1;1H\e[2J");
-    printCellVoltages(printTaskInputData.bmbTaskData.bmb);
-    printCellTemps(printTaskInputData.bmbTaskData.bmb);
+//    printCellVoltages(printTaskInputData.bmbTaskData.bmb);
+//    printCellTemps(printTaskInputData.bmbTaskData.bmb);
 
     printf("\n");
     printf("Min Cell V: %f\n", printTaskInputData.bmbTaskData.minCellVoltage);

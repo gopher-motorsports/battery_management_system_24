@@ -14,7 +14,7 @@
 
 // Charger TX CAN EXT ID, Charger RX EXT ID is CHARGER_CAN_ID + 1
 #define CHARGER_CAN_ID_TX                   0x1806E5F4
-// #define CHARGER_CAN_ID_RX                   0x18FF50E5
+ #define CHARGER_CAN_ID_RX                   0x18FF50E5
 
 // The delay between consecutive charger request CAN messages
 // The ELCON charger expects a message every 1s and will fault if a message is not recieve in 5s
@@ -53,7 +53,7 @@
 // The input voltage to the charger in volts
 #define CHARGER_INPUT_VOLTAGE_V             120.0f
 // The charger's input breaker current limit
-#define CHARGER_INPUT_CURRENT_A             10.0f
+#define CHARGER_INPUT_CURRENT_A             15.0f
 // The derating factor to apply to the charging current to account for temperature and other environmental factors
 #define CHARGER_CURRENT_DERATING_FACTOR     0.80f
 // The amount of power that the charger can draw from the wall
@@ -63,8 +63,8 @@
 // The amount of power that the charger can output to the battery pack
 #define CHARGER_OUTPUT_POWER_W              CHARGER_INPUT_POWER_W * MIN_CHARGER_EFFICIENCY
 
-// #define DEFAULT_CURRENT_LIMIT_A             13.0f
-#define DEFAULT_CURRENT_LIMIT_A             1.0f
+#define DEFAULT_CURRENT_LIMIT_A             13.0f
+//#define DEFAULT_CURRENT_LIMIT_A             1.0f
 #define CELL_VOLTAGE_TAPER_THRESHOLD        4.2f
 
 
