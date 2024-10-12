@@ -5,12 +5,13 @@
 #include "GopherCAN.h"
 #include "gopher_sense.h"
 #include "main.h"
+#include "alerts.h"
 
 // The number of gsense alerts that need to be logged
-#define NUM_GSENSE_ALERTS					26
+#define NUM_GSENSE_ALERTS					14
 // #define NUM_BOARD_TEMP_PER_BMB              16
 
-#define GOPHER_CAN_LOGGING_PERIOD_MS      1000
+#define GOPHER_CAN_LOGGING_PERIOD_MS      100
 
 extern CAN_HandleTypeDef hcan2;
 
@@ -38,23 +39,23 @@ void runGcanUpdateTask()
 {
     GcanTaskInputData gcanTaskInputData;
     taskENTER_CRITICAL();
-	gcanTaskInputData.currentSenseData.soc.soeByOcv = currentSenseOutputData.soc.soeByOcv;
-	gcanTaskInputData.currentSenseData.soc.soeByCoulombCounting = currentSenseOutputData.soc.soeByCoulombCounting;
+	// gcanTaskInputData.currentSenseData.soc.soeByOcv = currentSenseOutputData.soc.soeByOcv;
+	// gcanTaskInputData.currentSenseData.soc.soeByCoulombCounting = currentSenseOutputData.soc.soeByCoulombCounting;
 
-	gcanTaskInputData.bmbTaskData.avgBrickV = bmbTaskOutputData.avgBrickV;
-	gcanTaskInputData.bmbTaskData.maxCellVoltage = bmbTaskOutputData.maxCellVoltage;
-	gcanTaskInputData.bmbTaskData.minCellVoltage = bmbTaskOutputData.minCellVoltage;
+	// gcanTaskInputData.bmbTaskData.avgBrickV = bmbTaskOutputData.avgBrickV;
+	// gcanTaskInputData.bmbTaskData.maxCellVoltage = bmbTaskOutputData.maxCellVoltage;
+	// gcanTaskInputData.bmbTaskData.minCellVoltage = bmbTaskOutputData.minCellVoltage;
 
-	gcanTaskInputData.bmbTaskData.avgCellTemp = bmbTaskOutputData.avgCellTemp;
-	gcanTaskInputData.bmbTaskData.maxCellTemp = bmbTaskOutputData.maxCellTemp;
-	gcanTaskInputData.bmbTaskData.minCellTemp = bmbTaskOutputData.minCellTemp;
+	// gcanTaskInputData.bmbTaskData.avgCellTemp = bmbTaskOutputData.avgCellTemp;
+	// gcanTaskInputData.bmbTaskData.maxCellTemp = bmbTaskOutputData.maxCellTemp;
+	// gcanTaskInputData.bmbTaskData.minCellTemp = bmbTaskOutputData.minCellTemp;
 
-	gcanTaskInputData.bmbTaskData.avgBoardTemp = bmbTaskOutputData.avgBoardTemp;
-	gcanTaskInputData.bmbTaskData.maxBoardTemp = bmbTaskOutputData.maxBoardTemp;
-	gcanTaskInputData.bmbTaskData.minBoardTemp = bmbTaskOutputData.minBoardTemp;
+	// gcanTaskInputData.bmbTaskData.avgBoardTemp = bmbTaskOutputData.avgBoardTemp;
+	// gcanTaskInputData.bmbTaskData.maxBoardTemp = bmbTaskOutputData.maxBoardTemp;
+	// gcanTaskInputData.bmbTaskData.minBoardTemp = bmbTaskOutputData.minBoardTemp;
 
-    // gcanTaskInputData.bmbTaskData = bmbTaskOutputData;
-    // gcanTaskInputData.currentSenseData = currentSenseOutputData;
+    gcanTaskInputData.bmbTaskData = bmbTaskOutputData;
+    gcanTaskInputData.currentSenseData = currentSenseOutputData;
     taskEXIT_CRITICAL();
 
     // This condition is to stop gcan sending if we are testing with less than the full accumulator
@@ -127,35 +128,23 @@ void runGcanUpdateTask()
 		// 	{&seg7BMBAveBoardTemp_C, &seg7BMBMaxBoardTemp_C, &seg7BMBMinBoardTemp_C}
 		// };
 
-		// static U8_CAN_STRUCT *alertParams[NUM_GSENSE_ALERTS] =
-		// {
-		// 	&bmsOvervoltageWarningAlert_state,
-		// 	&bmsUndervoltageWarningAlert_state,
-		// 	&bmsOvervoltageFaultAlert_state,
-		// 	&bmsUndervoltageFaultAlert_state,
-		// 	&bmsCellImbalanceAlert_state,
-		// 	&bmsOvertempWarningAlert_state,
-		// 	&bmsOvertempFaultAlert_state,
-		// 	&bmsAmsSdcFaultAlert_state,
-		// 	&bmsBspdSdcFaultAlert_state,
-		// 	&bmsImdSdcFaultAlert_state,
-		// 	&bmsCurrentSensorErrorAlert_state,
-		// 	&bmsBmbCommunicationFailureAlert_state,
-		// 	&bmsBadVoltageSenseStatusAlert_state,
-		// 	&bmsBadBrickTempSenseStatusAlert_state,
-		// 	&bmsBadBoardTempSenseStatusAlert_state,
-		// 	&bmsInsufficientTempSensorsAlert_state,
-		// 	&bmsStackVsSegmentImbalanceAlert_state,
-		// 	&bmsChargerOverVoltageAlert_state,
-		// 	&bmsChargerOverCurrentAlert_state,
-		// 	&bmsChargerVoltageMismatchAlert_state,
-		// 	&bmsChargerCurrentMismatchAlert_state,
-		// 	&bmsChargerHardwareFailureAlert_state,
-		// 	&bmsChargerOverTempAlert_state,
-		// 	&bmsChargerInputVoltageErrorAlert_state,
-		// 	&bmsChargerBatteryNotDetectedErrorAlert_state,
-		// 	&bmsChargerCommunicationErrorAlert_state
-		// };
+		static U8_CAN_STRUCT *alertParams[NUM_GSENSE_ALERTS] =
+		{
+			&bmsOvervoltageWarningAlert_state,
+			&bmsUndervoltageWarningAlert_state,
+			&bmsOvervoltageFaultAlert_state,
+			&bmsUndervoltageFaultAlert_state,
+			&bmsCellImbalanceAlert_state,
+			&bmsOvertempWarningAlert_state,
+			&bmsOvertempFaultAlert_state,
+			&bmsAmsSdcFaultAlert_state,
+			&bmsBspdSdcFaultAlert_state,
+			&bmsImdSdcFaultAlert_state,
+			&bmsBadVoltageSenseStatusAlert_state,
+			&bmsBadBrickTempSenseStatusAlert_state,
+			&bmsBadBoardTempSenseStatusAlert_state,
+			&bmsInsufficientTempSensorsAlert_state
+		};
 
 		// static U8_CAN_STRUCT *cellVoltageStatusParams[NUM_BMBS_IN_ACCUMULATOR][NUM_CELLS_PER_BMB] =
 		// {
@@ -183,13 +172,6 @@ void runGcanUpdateTask()
 		if((HAL_GetTick() - lastHighFreqGcanUpdate) >= 25)
 		{
 			lastHighFreqGcanUpdate = HAL_GetTick();
-
-//			static float a = 0;
-//			a += 1.0;
-//			if(a > 100.0f)
-//			{
-//				a = 0.0f;
-//			}
 
 			update_and_queue_param_float(&soeByOCV_percent, gcanTaskInputData.currentSenseData.soc.soeByOcv * 100.0f);
 			update_and_queue_param_float(&soeByCoulombCounting_percent, gcanTaskInputData.currentSenseData.soc.soeByOcv * 100.0f);
@@ -221,6 +203,27 @@ void runGcanUpdateTask()
 //			update_and_queue_param_float(&bmsMaxBoardTemp_C, gcanTaskInputData.bmbTaskData.maxBoardTemp);
 //			update_and_queue_param_float(&bmsMinBoardTemp_C, gcanTaskInputData.bmbTaskData.minBoardTemp);
 
+			// update_and_queue_param_u8(&bmsCurrAlertIndex_state, displayData.currAlertIndex);
+			// update_and_queue_param_u8(&bmsAlertMessage_state, displayData.alertMessage);
+			// update_and_queue_param_u8(&bmsCurrAlertIsLatched_state, displayData.currAlertIsLatched);
+
+			// Cycle through all alerts
+			uint32_t alertsSet = 0;
+			for (uint32_t i = 0; i < NUM_BMB_ALERTS; i++)
+			{
+				Alert_S* alert = bmbAlerts[i];
+				const AlertStatus_E alertStatus = getAlertStatus(alert);
+				if ((alertStatus == ALERT_SET) || (alertStatus == ALERT_LATCHED))
+				{
+					update_and_queue_param_u8(alertParams[i], 1);
+					alertsSet++;
+				} else {
+					update_and_queue_param_u8(alertParams[i], 0);
+				}
+			}
+
+			update_and_queue_param_u8(&bmsNumActiveAlerts_state, alertsSet);
+
 			service_can_tx(&hcan2);
 		}
 
@@ -243,50 +246,50 @@ void runGcanUpdateTask()
 		// 		case GCAN_SEGMENT_7:
 		// 		case GCAN_SEGMENT_8:
 					
-		// 			update_and_queue_param_float(cellVoltageStatsParams[gcanUpdateState][0], gBms.bmb[gcanUpdateState].segmentV);
-		// 			update_and_queue_param_float(cellVoltageStatsParams[gcanUpdateState][1], gBms.bmb[gcanUpdateState].avgBrickV);
-		// 			update_and_queue_param_float(cellVoltageStatsParams[gcanUpdateState][2], gBms.bmb[gcanUpdateState].maxBrickV);
-		// 			update_and_queue_param_float(cellVoltageStatsParams[gcanUpdateState][3], gBms.bmb[gcanUpdateState].minBrickV);
+		// 			update_and_queue_param_float(cellVoltageStatsParams[gcanUpdateState][0], gcanTaskInputData.bmbTaskData.bmb[gcanUpdateState].sumBrickVoltage);
+		// 			update_and_queue_param_float(cellVoltageStatsParams[gcanUpdateState][1], gcanTaskInputData.bmbTaskData.bmb[gcanUpdateState].avgBrickVoltage);
+		// 			update_and_queue_param_float(cellVoltageStatsParams[gcanUpdateState][2], gcanTaskInputData.bmbTaskData.bmb[gcanUpdateState].maxBrickVoltage);
+		// 			update_and_queue_param_float(cellVoltageStatsParams[gcanUpdateState][3], gcanTaskInputData.bmbTaskData.bmb[gcanUpdateState].minBrickVoltage);
 					
 
 		// 			for (int32_t i = 0; i < NUM_CELLS_PER_BMB; i++)
 		// 			{
-		// 				update_and_queue_param_float(cellVoltageParams[gcanUpdateState][i], gBms.bmb[gcanUpdateState].brickV[i]);
-		// 				update_and_queue_param_float(cellTempParams[gcanUpdateState][i], gBms.bmb[gcanUpdateState].brickTemp[i]);
+		// 				update_and_queue_param_float(cellVoltageParams[gcanUpdateState][i], gcanTaskInputData.bmbTaskData.bmb[gcanUpdateState].cellVoltage[i]);
+		// 				update_and_queue_param_float(cellTempParams[gcanUpdateState][i], gcanTaskInputData.bmbTaskData.bmb[gcanUpdateState].cellTemp[i]);
 
-		// 				update_and_queue_param_float(cellVoltageStatusParams[gcanUpdateState][i], gBms.bmb[gcanUpdateState].brickVStatus[i]);
-		// 				update_and_queue_param_float(cellTempStatusParams[gcanUpdateState][i], gBms.bmb[gcanUpdateState].brickTempStatus[i]);
+		// 				update_and_queue_param_float(cellVoltageStatusParams[gcanUpdateState][i], gcanTaskInputData.bmbTaskData.bmb[gcanUpdateState].cellVoltageStatus[i]);
+		// 				update_and_queue_param_float(cellTempStatusParams[gcanUpdateState][i], gcanTaskInputData.bmbTaskData.bmb[gcanUpdateState].cellTempStatus[i]);
 		// 			}
 
-		// 			for (int32_t i = 0; i < NUM_BOARD_TEMP_PER_BMB; i++)
-		// 			{
-		// 				update_and_queue_param_float(boardTempParams[gcanUpdateState][i], gBms.bmb[gcanUpdateState].boardTemp[i]);
-		// 			}
-		// 			break;
+		// 			// for (int32_t i = 0; i < NUM_BOARD_TEMP_PER_BMB; i++)
+		// 			// {
+		// 				// update_and_queue_param_float(boardTempParams[gcanUpdateState][i], gcanTaskInputData.bmbTaskData.bmb[gcanUpdateState].boardTemp[i]);
+		// 			// }
+		// 			// break;
 				
 		// 		case GCAN_CELL_TEMP_STATS:
 		// 			for (int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
 		// 			{
-		// 				update_and_queue_param_float(cellTempStatsParams[i][0], gBms.bmb[i].avgBrickTemp);
-		// 				update_and_queue_param_float(cellTempStatsParams[i][1], gBms.bmb[i].maxBrickTemp);
-		// 				update_and_queue_param_float(cellTempStatsParams[i][2], gBms.bmb[i].minBrickTemp);
+		// 				update_and_queue_param_float(cellTempStatsParams[i][0], gcanTaskInputData.bmbTaskData.bmb[i].avgBrickTemp);
+		// 				update_and_queue_param_float(cellTempStatsParams[i][1], gcanTaskInputData.bmbTaskData.bmb[i].maxBrickTemp);
+		// 				update_and_queue_param_float(cellTempStatsParams[i][2], gcanTaskInputData.bmbTaskData.bmb[i].minBrickTemp);
 		// 			}
 
-		// 			update_and_queue_param_u8(&amsFault_state, gBms.amsFaultStatus);
-		// 			update_and_queue_param_u8(&bspdFault_state, gBms.bspdFaultStatus);
+		// 			update_and_queue_param_u8(&amsFault_state, gcanTaskInputData.bmbTaskData.amsFaultStatus);
+		// 			update_and_queue_param_u8(&bspdFault_state, gcanTaskInputData.bmbTaskData.bspdFaultStatus);
 
 		// 			break;
 
 		// 		case GCAN_BOARD_TEMP_STATS:
 		// 			for (int32_t i = 0; i < NUM_BMBS_IN_ACCUMULATOR; i++)
 		// 			{
-		// 				update_and_queue_param_float(boardTempStatsParams[i][0], gBms.bmb[i].avgBoardTemp);
-		// 				update_and_queue_param_float(boardTempStatsParams[i][1], gBms.bmb[i].maxBoardTemp);
-		// 				update_and_queue_param_float(boardTempStatsParams[i][2], gBms.bmb[i].minBoardTemp);
+		// 				update_and_queue_param_float(boardTempStatsParams[i][0], gcanTaskInputData.bmbTaskData.bmb[i].avgBoardTemp);
+		// 				update_and_queue_param_float(boardTempStatsParams[i][1], gcanTaskInputData.bmbTaskData.bmb[i].maxBoardTemp);
+		// 				update_and_queue_param_float(boardTempStatsParams[i][2], gcanTaskInputData.bmbTaskData.bmb[i].minBoardTemp);
 		// 			}
 
-		// 			update_and_queue_param_u8(&imdFault_state, gBms.imdFaultStatus);
-		// 			update_and_queue_param_u8(&imdFaultInfo_state, gBms.imdState);
+		// 			update_and_queue_param_u8(&imdFault_state, gcanTaskInputData.bmbTaskData.imdFaultStatus);
+		// 			update_and_queue_param_u8(&imdFaultInfo_state, gcanTaskInputData.bmbTaskData.imdState);
 
 		// 			break;
 
@@ -321,7 +324,7 @@ void runGcanUpdateTask()
 		// 	gcanUpdateState++;
 		// 	gcanUpdateState %= NUM_GCAN_STATES;
 
-//		 	service_can_tx(&hcan2);
+		//  	service_can_tx(&hcan2);
 		// }
 	}
     
