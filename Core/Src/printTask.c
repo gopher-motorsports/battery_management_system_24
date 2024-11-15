@@ -372,7 +372,7 @@ void runPrintTask()
     taskEXIT_CRITICAL();
 
     printf("\e[1;1H\e[2J");
-//    printCellVoltages(printTaskInputData.bmbTaskData.bmb);
+   printCellVoltages(printTaskInputData.bmbTaskData.bmb);
 //    printCellTemps(printTaskInputData.bmbTaskData.bmb);
 
     printf("\n");
