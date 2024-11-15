@@ -1295,12 +1295,12 @@ static TRANSACTION_STATUS_E runSwitchPinStateMachine(BmbTaskOutputData_S* bmbDat
     {
         if(balancingEnabled)
         {
-            // msgStatus = updateBalanceSwitches(bmbData);
-            // if(msgStatus != TRANSACTION_SUCCESS)
-            // {
-            //     return msgStatus;
-            // }
-            // return TRANSACTION_SUCCESS;
+            msgStatus = updateBalanceSwitches(bmbData);
+            if(msgStatus != TRANSACTION_SUCCESS)
+            {
+                return msgStatus;
+            }
+            return TRANSACTION_SUCCESS;
         }
         else
         {
@@ -1470,7 +1470,7 @@ void runBmbUpdateTask()
     // status = updateTestData(bmbTaskOutputDataLocal.bmb);
     // HANDLE_BMB_ERROR(status);
 
-    // status = runSwitchPinStateMachine(&bmbTaskOutputDataLocal, chargerConnected);
+    status = runSwitchPinStateMachine(&bmbTaskOutputDataLocal, chargerConnected);
     // HANDLE_BMB_ERROR(status);    
 
     runBmbAlertMonitor(&bmbTaskOutputData);
