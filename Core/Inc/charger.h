@@ -25,8 +25,8 @@
 #define CHARGER_RX_TIMEOUT_MS         5000
 
 // Hysteresis bounds for accumulator imbalance
-#define MAX_CELL_IMBALANCE_THRES_HIGH       0.1f
-#define MAX_CELL_IMBALANCE_THRES_LOW        0.05f
+#define MAX_CELL_IMBALANCE_THRES_HIGH       0.5f
+#define MAX_CELL_IMBALANCE_THRES_LOW        0.25f
 
 // Hysteresis bounds for max cell voltage
 #define MAX_CELL_VOLTAGE_THRES_HIGH         4.29f
@@ -53,13 +53,13 @@
 // The input voltage to the charger in volts
 #define CHARGER_INPUT_VOLTAGE_V             120.0f
 // The charger's input breaker current limit
-#define CHARGER_INPUT_CURRENT_A             15.0f
+#define CHARGER_INPUT_CURRENT_A             20.0f
 // The derating factor to apply to the charging current to account for temperature and other environmental factors
-#define CHARGER_CURRENT_DERATING_FACTOR     0.80f
+#define CHARGER_CURRENT_DERATING_FACTOR     0.90f
 // The amount of power that the charger can draw from the wall
 #define CHARGER_INPUT_POWER_W               CHARGER_INPUT_VOLTAGE_V * CHARGER_INPUT_CURRENT_A * CHARGER_CURRENT_DERATING_FACTOR
 // The expected efficiency of the charger
-#define MIN_CHARGER_EFFICIENCY              0.9f
+#define MIN_CHARGER_EFFICIENCY              0.92f
 // The amount of power that the charger can output to the battery pack
 #define CHARGER_OUTPUT_POWER_W              CHARGER_INPUT_POWER_W * MIN_CHARGER_EFFICIENCY
 
